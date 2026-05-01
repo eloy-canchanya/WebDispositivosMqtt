@@ -1,3 +1,5 @@
+using WebDispositivosMqtt.Hubs;
+
 namespace WebDispositivosMqtt
 {
     public class Program
@@ -7,7 +9,12 @@ namespace WebDispositivosMqtt
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.
+            // MVC
             builder.Services.AddControllersWithViews();
+            
+            //SignalR
+            builder.Services.AddSignalR();
+            builder.Services.AddSignalRCore();
 
             var app = builder.Build();
 
@@ -25,10 +32,16 @@ namespace WebDispositivosMqtt
             app.UseAuthorization();
 
             app.MapStaticAssets();
+
+            // rutas MVC
             app.MapControllerRoute(
                 name: "default",
                 pattern: "{controller=Home}/{action=Index}/{id?}")
                 .WithStaticAssets();
+
+            // rutas SignalR
+            app.MapHub<EchoHub>("/Hubs/EchoHub");
+
 
             app.Run();
         }

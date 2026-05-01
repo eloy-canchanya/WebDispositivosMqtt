@@ -1,8 +1,111 @@
 ﻿@{
-    ViewData["Title"] = "Home Page";
+    ViewData["Title"] = "Prueba SignalR";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="row">
+    <div class="col-md-8">
+        <h1 class="display-6">Prueba SignalR - Echo global</h1>
+        <p class="text-muted">
+            Abre esta página en dos pestañas y envía mensajes para comprobar el tiempo real.
+        </p>
+
+        <div class="mb-3">
+            <label for="usuario" class="form-label">Usuario</label>
+            <input id="usuario" class="form-control" value="Usuario web" />
+        </div>
+
+        <div class="mb-3">
+            <label for="mensaje" class="form-label">Mensaje</label>
+            <input id="mensaje" class="form-control" placeholder="Escribe un mensaje" />
+        </div>
+
+        <div class="mb-3 d-flex gap-2">
+            <button id="btnConectar" class="btn btn-secondary">Conectar</button>
+            <button id="btnEnviar" class="btn btn-primary" disabled>Enviar a todos</button>
+        </div>
+
+        <div class="mb-3">
+            <strong>Estado:</strong>
+            <span id="estado" class="badge bg-warning text-dark">Desconectado</span>
+        </div>
+
+        <hr />
+
+        <h2 class="h4">Mensajes recibidos</h2>
+        <ul id="mensajes" class="list-group"></ul>
+    </div>
 </div>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+    <script>
+        const estado = document.getElementById("estado");
+        const btnConectar = document.getElementById("btnConectar");
+        const btnEnviar = document.getElementById("btnEnviar");
+        const inputUsuario = document.getElementById("usuario");
+        const inputMensaje = document.getElementById("mensaje");
+        const listaMensajes = document.getElementById("mensajes");
+
+        const connection = new signalR.HubConnectionBuilder()
+        .withUrl("/Hubs/EchoHub")
+        .withAutomaticReconnect()
+        .build();
+
+        connection.on("RecibirMensaje", (usuario, mensaje, fecha) => {
+        const item = document.createElement("li");
+        item.className = "list-group-item";
+        item.textContent = `[${fecha}] ${usuario}: ${mensaje}`;
+        listaMensajes.prepend(item);
+        });
+
+        connection.onreconnecting(() => {
+        estado.textContent = "Reconectando";
+        estado.className = "badge bg-warning text-dark";
+        btnEnviar.disabled = true;
+        });
+
+        connection.onreconnected(() => {
+        estado.textContent = "Conectado";
+        estado.className = "badge bg-success";
+        btnEnviar.disabled = false;
+        });
+
+        connection.onclose(() => {
+        estado.textContent = "Desconectado";
+        estado.className = "badge bg-danger";
+        btnEnviar.disabled = true;
+        });
+
+        btnConectar.addEventListener("click", async () => {
+        try {
+            await connection.start();
+            estado.textContent = "Conectado";
+            estado.className = "badge bg-success";
+            btnEnviar.disabled = false;
+        } catch {
+            estado.textContent = "Error al conectar";
+            estado.className = "badge bg-danger";
+        }
+        });
+
+        btnEnviar.addEventListener("click", async () => {
+            const usuario = inputUsuario.value.trim();
+            const mensaje = inputMensaje.value.trim();
+
+            if (!usuario || !mensaje) {
+            return;
+            }
+
+            await connection.invoke("EnviarMensaje", usuario, mensaje);
+            inputMensaje.value = "";
+            inputMensaje.focus();
+            });
+
+            inputMensaje.addEventListener("keydown", async (event) => {
+            if (event.key === "Enter" && !btnEnviar.disabled) {
+            event.preventDefault();
+            btnEnviar.click();
+            }
+        });
+    </script>
+}
