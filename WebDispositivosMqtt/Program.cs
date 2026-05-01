@@ -1,4 +1,5 @@
 using WebDispositivosMqtt.Hubs;
+using WebDispositivosMqtt.Services;
 
 namespace WebDispositivosMqtt
 {
@@ -14,7 +15,9 @@ namespace WebDispositivosMqtt
             
             //SignalR
             builder.Services.AddSignalR();
-            builder.Services.AddSignalRCore();
+
+            builder.Services.AddSingleton<ConnectionTracker>();
+
 
             var app = builder.Build();
 
