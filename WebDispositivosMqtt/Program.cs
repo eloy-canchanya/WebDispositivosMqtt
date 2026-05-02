@@ -16,8 +16,12 @@ namespace WebDispositivosMqtt
             //SignalR
             builder.Services.AddSignalR();
 
+            // singleton para contar conexiones
             builder.Services.AddSingleton<ConnectionTracker>();
-
+            
+            //mqtt
+            builder.Services.Configure<MqttOptions>(builder.Configuration.GetSection("Mqtt"));
+            builder.Services.AddHostedService<MqttListenerService>();
 
             var app = builder.Build();
 
