@@ -1,24 +1,52 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
+using WebDispositivosMqtt.Data;
 using WebDispositivosMqtt.Hubs;
+using WebDispositivosMqtt.Models;
 using WebDispositivosMqtt.Services;
 
 namespace WebDispositivosMqtt
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.
             // MVC
             builder.Services.AddControllersWithViews();
-            
+
+            // EF core + Identity
+
+            builder.Services.AddDbContext<ApplicationDbContext>(options =>
+                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+            builder.Services
+             .AddIdentity<ApplicationUser, IdentityRole>(options =>
+             {
+                 options.SignIn.RequireConfirmedAccount = false;
+                 options.Password.RequireDigit = true;
+                 options.Password.RequireUppercase = false;
+                 options.Password.RequireNonAlphanumeric = false;
+                 options.Password.RequiredLength = 6;
+             })
+             .AddEntityFrameworkStores<ApplicationDbContext>()
+             .AddDefaultTokenProviders();
+
+            builder.Services.ConfigureApplicationCookie(options =>
+            {
+                options.LoginPath = "/Account/Login";
+                options.AccessDeniedPath = "/Account/AccessDenied";
+            });
+
+
             //SignalR
             builder.Services.AddSignalR();
 
             // singleton para contar conexiones
             builder.Services.AddSingleton<ConnectionTracker>();
-            
+
             //mqtt
             builder.Services.Configure<MqttOptions>(builder.Configuration.GetSection("Mqtt"));
             builder.Services.AddHostedService<MqttListenerService>();
@@ -36,6 +64,7 @@ namespace WebDispositivosMqtt
             app.UseHttpsRedirection();
             app.UseRouting();
 
+            app.UseAuthentication();
             app.UseAuthorization();
 
             app.MapStaticAssets();
@@ -49,8 +78,61 @@ namespace WebDispositivosMqtt
             // rutas SignalR
             app.MapHub<EchoHub>("/Hubs/EchoHub");
 
+            if (app.Environment.IsDevelopment())
+            {
+                await SeedDevelopmentUser(app);
+            }
 
             app.Run();
+        }
+
+        private static async Task SeedDevelopmentUser(WebApplication app)
+        {
+            using var scope = app.Services.CreateScope();
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+
+            const string adminRole = "Admin";
+            const string email = "admin@local.test";
+            const string password = "Admin123";
+
+            if (!await roleManager.RoleExistsAsync(adminRole))
+            {
+                var roleResult = await roleManager.CreateAsync(new IdentityRole(adminRole));
+                if (!roleResult.Succeeded)
+                {
+                    var roleErrors = string.Join(", ", roleResult.Errors.Select(e => e.Description));
+                    throw new InvalidOperationException($"No se pudo crear rol Admin: {roleErrors}");
+                }
+            }
+
+            var user = await userManager.FindByEmailAsync(email);
+            if (user is null)
+            {
+                user = new ApplicationUser
+                {
+                    UserName = email,
+                    Email = email,
+                    EmailConfirmed = true
+                };
+
+                var createResult = await userManager.CreateAsync(user, password);
+                if (!createResult.Succeeded)
+                {
+                    var errors = string.Join(", ", createResult.Errors.Select(e => e.Description));
+                    throw new InvalidOperationException($"Seed falló: {errors}");
+                }
+            }
+
+            if (!await userManager.IsInRoleAsync(user, adminRole))
+            {
+                var addRoleResult = await userManager.AddToRoleAsync(user, adminRole);
+                if (!addRoleResult.Succeeded)
+                {
+                    var roleErrors = string.Join(", ", addRoleResult.Errors.Select(e => e.Description));
+                    throw new InvalidOperationException($"No se pudo asignar rol Admin: {roleErrors}");
+                }
+            }
         }
     }
 }
