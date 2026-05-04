@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using WebDispositivosMqtt.Data.Identity;
 
@@ -11,9 +12,11 @@ using WebDispositivosMqtt.Data.Identity;
 namespace WebDispositivosMqtt.Migrations
 {
     [DbContext(typeof(IdentityAppDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260504225241_MoveIdentityTablesToIdentitySchema")]
+    partial class MoveIdentityTablesToIdentitySchema
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
