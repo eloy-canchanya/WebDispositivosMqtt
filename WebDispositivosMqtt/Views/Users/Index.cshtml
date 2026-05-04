@@ -1,0 +1,91 @@
+@model IReadOnlyList<WebDispositivosMqtt.Models.UserListItemViewModel>
+
+@{
+    ViewData["Title"] = "Usuarios";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Usuarios</h2>
+    <a asp-action="Create" class="btn btn-primary">Nuevo usuario</a>
+</div>
+
+@if (TempData["Ok"] is string okMessage)
+{
+    <div class="alert alert-success" role="alert">@okMessage</div>
+}
+
+@if (TempData["Error"] is string errorMessage)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+<table class="table table-striped align-middle">
+    <thead>
+        <tr>
+            <th>Email</th>
+            <th>Teléfono</th>
+            <th>Email confirmado</th>
+            <th>Estado</th>
+            <th style="width: 320px;">Acción</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (Model.Count == 0)
+        {
+            <tr>
+                <td colspan="5" class="text-center text-muted">No hay usuarios</td>
+            </tr>
+        }
+        else
+        {
+            foreach (var u in Model)
+            {
+                <tr>
+                    <td>@u.Email</td>
+                    <td>@(string.IsNullOrWhiteSpace(u.PhoneNumber) ? "-" : u.PhoneNumber)</td>
+                    <td>@(u.EmailConfirmed ? "Sí" : "No")</td>
+                    <td>
+                        @if (u.IsLockedOut)
+                        {
+                            <span class="badge bg-danger">Deshabilitado</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-success">Activo</span>
+                        }
+                    </td>
+                    <td>
+                        @if (string.Equals(u.Email, User.Identity?.Name, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <span class="text-muted">Tu cuenta</span>
+                        }
+                        else
+                        {
+                            <div class="d-flex gap-1 flex-wrap">
+                                <a asp-action="ResetPassword" asp-route-id="@u.Id" class="btn btn-sm btn-outline-primary">Reset clave</a>
+
+                                @if (u.IsLockedOut)
+                                {
+                                    <form asp-action="Enable" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@u.Id" />
+                                        <button type="submit" class="btn btn-sm btn-success">Habilitar</button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <form asp-action="Disable" method="post" class="d-inline"
+                                          onsubmit="return confirm('¿Seguro que deseas deshabilitar este usuario?');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@u.Id" />
+                                        <button type="submit" class="btn btn-sm btn-warning">Deshabilitar</button>
+                                    </form>
+                                }
+                            </div>
+                        }
+                    </td>
+                </tr>
+            }
+        }
+    </tbody>
+</table>
