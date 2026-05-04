@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
-using WebDispositivosMqtt.Data;
 using WebDispositivosMqtt.Hubs;
-using WebDispositivosMqtt.Models;
 using WebDispositivosMqtt.Services;
+using WebDispositivosMqtt.Data.Identity;
+using WebDispositivosMqtt.Data.Identity.Models;
 
 namespace WebDispositivosMqtt
 {
@@ -19,7 +19,7 @@ namespace WebDispositivosMqtt
 
             // EF core + Identity
 
-            builder.Services.AddDbContext<ApplicationDbContext>(options =>
+            builder.Services.AddDbContext<IdentityAppDbContext>(options =>
                 options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
             builder.Services
@@ -31,7 +31,7 @@ namespace WebDispositivosMqtt
                  options.Password.RequireNonAlphanumeric = false;
                  options.Password.RequiredLength = 6;
              })
-             .AddEntityFrameworkStores<ApplicationDbContext>()
+             .AddEntityFrameworkStores<IdentityAppDbContext>()
              .AddDefaultTokenProviders();
 
             builder.Services.ConfigureApplicationCookie(options =>
