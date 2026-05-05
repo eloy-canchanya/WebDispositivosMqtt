@@ -2,8 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using WebDispositivosMqtt.Hubs;
 using WebDispositivosMqtt.Services;
-using WebDispositivosMqtt.Data.Identity;
-using WebDispositivosMqtt.Data.Identity.Models;
+using WebDispositivosMqtt.Identity;
 
 namespace WebDispositivosMqtt
 {

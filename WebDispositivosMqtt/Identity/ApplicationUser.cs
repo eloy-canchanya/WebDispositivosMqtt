@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Identity;
 
-namespace WebDispositivosMqtt.Data.Identity.Models
+namespace WebDispositivosMqtt.Identity
 {
     public class ApplicationUser : IdentityUser
     {
