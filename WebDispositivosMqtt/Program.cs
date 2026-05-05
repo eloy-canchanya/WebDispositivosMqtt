@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Identity;
 using WebDispositivosMqtt.Hubs;
 using WebDispositivosMqtt.Services;
 using WebDispositivosMqtt.Identity;
+using WebDispositivosMqtt.DataIdentity.Models;
+using WebDispositivosMqtt.Data;
 
 namespace WebDispositivosMqtt
 {
@@ -17,7 +19,6 @@ namespace WebDispositivosMqtt
             builder.Services.AddControllersWithViews();
 
             // EF core + Identity
-
             builder.Services.AddDbContext<IdentityAppDbContext>(options =>
                 options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -33,12 +34,15 @@ namespace WebDispositivosMqtt
              .AddEntityFrameworkStores<IdentityAppDbContext>()
              .AddDefaultTokenProviders();
 
+            // DatabaseContext
+            builder.Services.AddDbContext<DatabaseContext>(options =>
+                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
             builder.Services.ConfigureApplicationCookie(options =>
             {
                 options.LoginPath = "/Account/Login";
                 options.AccessDeniedPath = "/Account/AccessDenied";
             });
-
 
             //SignalR
             builder.Services.AddSignalR();

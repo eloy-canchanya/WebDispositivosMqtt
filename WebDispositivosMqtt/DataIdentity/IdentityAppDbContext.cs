@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using WebDispositivosMqtt.DataIdentity.Models;
 
 namespace WebDispositivosMqtt.Identity
 {
