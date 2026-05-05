@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using WebDispositivosMqtt.Identity;
+using WebDispositivosMqtt.DataIdentity.Models;
 using WebDispositivosMqtt.Models;
 
 namespace WebDispositivosMqtt.Controllers
