@@ -1,9 +1,8 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using WebDispositivosMqtt.Data.Identity.Models;
 
-namespace WebDispositivosMqtt.Data.Identity
+namespace WebDispositivosMqtt.Identity
 {
     public class IdentityAppDbContext : IdentityDbContext<ApplicationUser>
     {

@@ -20,8 +20,4 @@
     <PackageReference Include="MQTTnet" Version="5.1.0.1559" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Data\App\" />
-  </ItemGroup>
-
 </Project>
