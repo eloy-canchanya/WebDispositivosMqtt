@@ -5,6 +5,8 @@ using WebDispositivosMqtt.Services;
 using WebDispositivosMqtt.Identity;
 using WebDispositivosMqtt.DataIdentity.Models;
 using WebDispositivosMqtt.Data;
+using WebDispositivosMqtt.Services.Mqtt;
+using WebDispositivosMqtt.Services.NewDevices;
 
 namespace WebDispositivosMqtt
 {
@@ -50,9 +52,13 @@ namespace WebDispositivosMqtt
             // singleton para contar conexiones
             builder.Services.AddSingleton<ConnectionTracker>();
 
-            //mqtt
+            // Servicio mqtt
             builder.Services.Configure<MqttOptions>(builder.Configuration.GetSection("Mqtt"));
             builder.Services.AddHostedService<MqttListenerService>();
+
+            // Servicio para registrar dispositivos nuevos
+            builder.Services.AddSingleton<INewDevicesService, NewDevicesService>();
+            builder.Services.AddHostedService<UnregisteredCleanupWorker>();
 
             var app = builder.Build();
 
@@ -80,6 +86,7 @@ namespace WebDispositivosMqtt
 
             // rutas SignalR
             app.MapHub<EchoHub>("/Hubs/EchoHub");
+            app.MapHub<NewDeviceHub>("/Hubs/NewDeviceHub");
 
             if (app.Environment.IsDevelopment())
             {
