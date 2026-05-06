@@ -3,8 +3,9 @@ using Microsoft.Extensions.Options;
 using MQTTnet;
 using MQTTnet.Protocol;
 using WebDispositivosMqtt.Hubs;
+using WebDispositivosMqtt.Services.NewDevices;
 
-namespace WebDispositivosMqtt.Services
+namespace WebDispositivosMqtt.Services.Mqtt
 {
     public class MqttListenerService : BackgroundService
     {
@@ -12,15 +13,18 @@ namespace WebDispositivosMqtt.Services
         private readonly IHubContext<EchoHub> _hubContext;
         private readonly ILogger<MqttListenerService> _logger;
         private IMqttClient? _mqttClient;
+        private readonly INewDevicesService _newDeviceService;
 
         public MqttListenerService(
             IOptions<MqttOptions> options,
             IHubContext<EchoHub> hubContext,
-            ILogger<MqttListenerService> logger)
+            ILogger<MqttListenerService> logger,
+            INewDevicesService newDeviceService)
         {
             _options = options.Value;
             _hubContext = hubContext;
             _logger = logger;
+            _newDeviceService = newDeviceService;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -28,20 +32,49 @@ namespace WebDispositivosMqtt.Services
             var factory = new MqttClientFactory();
             _mqttClient = factory.CreateMqttClient();
 
+
+            // configuracion de eventos
             _mqttClient.ApplicationMessageReceivedAsync += async eventArgs =>
             {
                 var topic = eventArgs.ApplicationMessage.Topic;
                 var payload = eventArgs.ApplicationMessage.ConvertPayloadToString() ?? string.Empty;
-                var fecha = DateTime.Now.ToString("HH:mm:ss");
 
-                _logger.LogInformation("MQTT recibido. Topic: {Topic} Payload: {Payload}", topic, payload);
+                if (topic.StartsWith("app/unregistered"))
+                {
+                    var parts = topic.Split('/');
 
-                await _hubContext.Clients.All.SendAsync(
-                    "RecibirMensajeMqtt",
-                    topic,
-                    payload,
-                    fecha,
-                    cancellationToken: stoppingToken);
+                    // app/unregistered/{mac}/register
+                    var tempId = parts.Length > 2 ? parts[2] : null;
+
+                    if (!string.IsNullOrEmpty(tempId))
+                    {
+                        await _newDeviceService.AddOrUpdateAsync(tempId);
+                    }
+
+                    return; // 🔥 IMPORTANTE: no seguir procesando
+                }
+                else
+                {
+
+                    var fecha = DateTime.Now.ToString("HH:mm:ss");
+
+                    _logger.LogInformation("MQTT recibido. Topic: {Topic} Payload: {Payload}", topic, payload);
+
+                    await _hubContext.Clients.All.SendAsync(
+                        "RecibirMensajeMqtt",
+                        topic,
+                        payload,
+                        fecha,
+                        cancellationToken: stoppingToken);
+
+
+                }
+
+
+
+
+
+
             };
 
             _mqttClient.ConnectedAsync += async _ =>

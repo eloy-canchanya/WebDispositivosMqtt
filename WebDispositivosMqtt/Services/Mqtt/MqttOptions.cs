@@ -1,4 +1,4 @@
-﻿namespace WebDispositivosMqtt.Services
+﻿namespace WebDispositivosMqtt.Services.Mqtt
 {
 
     public class MqttOptions
