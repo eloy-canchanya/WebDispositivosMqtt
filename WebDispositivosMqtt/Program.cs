@@ -86,7 +86,7 @@ namespace WebDispositivosMqtt
 
             // rutas SignalR
             app.MapHub<EchoHub>("/Hubs/EchoHub");
-            app.MapHub<NewDeviceHub>("/Hubs/NewDeviceHub");
+            app.MapHub<NewDevicesHub>("/Hubs/NewDeviceHub");
 
             if (app.Environment.IsDevelopment())
             {
