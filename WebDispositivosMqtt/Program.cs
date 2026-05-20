@@ -36,15 +36,15 @@ namespace WebDispositivosMqtt
              .AddEntityFrameworkStores<IdentityAppDbContext>()
              .AddDefaultTokenProviders();
 
-            // DatabaseContext
-            builder.Services.AddDbContext<DatabaseContext>(options =>
-                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-
             builder.Services.ConfigureApplicationCookie(options =>
             {
                 options.LoginPath = "/Account/Login";
                 options.AccessDeniedPath = "/Account/AccessDenied";
             });
+
+            // DatabaseContext
+            builder.Services.AddDbContext<DatabaseContext>(options =>
+                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
             //SignalR
             builder.Services.AddSignalR();
@@ -58,7 +58,7 @@ namespace WebDispositivosMqtt
 
             // Servicio para registrar dispositivos nuevos
             builder.Services.AddSingleton<INewDevicesService, NewDevicesService>();
-            builder.Services.AddHostedService<UnregisteredCleanupWorker>();
+            builder.Services.AddHostedService<NewDevicesCleanupWorker>();
 
             var app = builder.Build();
 

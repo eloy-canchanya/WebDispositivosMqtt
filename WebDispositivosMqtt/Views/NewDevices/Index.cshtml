@@ -1,5 +1,4 @@
-﻿@* @model IReadOnlyCollection<WebDispositivosMqtt.Services.UnregisteredDevice> *@
-@model IReadOnlyCollection<WebDispositivosMqtt.Services.NewDevices.NewDevice>
+﻿@model IReadOnlyCollection<WebDispositivosMqtt.Services.NewDevices.NewDevice>
 
 @{
     ViewData["Title"] = "Nuevos dispositivos";
@@ -20,6 +19,15 @@
             Lista inicial cargada desde <code>NewDevicesService</code> y actualización en tiempo real con SignalR.
         </p>
 
+        @if (TempData["Ok"] is string okMsg)
+        {
+            <div class="alert alert-success">@okMsg</div>
+        }
+        @if (TempData["Error"] is string errMsg)
+        {
+            <div class="alert alert-danger">@errMsg</div>
+        }
+
         <div class="mb-3">
             <strong>Estado conexión hub:</strong>
             <span id="hubStatus" class="badge bg-warning text-dark">Desconectado</span>
@@ -31,10 +39,47 @@
                     <th>TempId</th>
                     <th>LastSeen (UTC)</th>
                     <th>Status</th>
+                    <th style="width: 140px;">Acción</th>
                 </tr>
             </thead>
             <tbody id="devicesBody"></tbody>
         </table>
+    </div>
+</div>
+
+<!-- Modal de registro -->
+<div class="modal fade" id="registerDeviceModal" tabindex="-1" aria-labelledby="registerDeviceModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" asp-controller="NewDevices" asp-action="RegisterDevice">
+                @Html.AntiForgeryToken()
+
+                <div class="modal-header">
+                    <h5 class="modal-title" id="registerDeviceModalLabel">Registrar dispositivo</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+
+                <div class="modal-body">
+                    <input type="hidden" id="tempIdInput" name="tempId" />
+
+                    <div class="mb-3">
+                        <label class="form-label" for="macAddressInput">MAC</label>
+                        <input type="text" class="form-control" id="macAddressInput" name="macAddress" maxlength="12" required />
+                        <div class="form-text">Se normaliza a 12 hexadecimales (sin : ni -).</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="displayNameInput">Nombre del dispositivo</label>
+                        <input type="text" class="form-control" id="displayNameInput" name="displayName" maxlength="100" required />
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Registrar</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
@@ -43,6 +88,13 @@
     <script>
         const hubStatus = document.getElementById("hubStatus");
         const devicesBody = document.getElementById("devicesBody");
+
+        const registerModalEl = document.getElementById("registerDeviceModal");
+        const registerModal = new bootstrap.Modal(registerModalEl);
+
+        const tempIdInput = document.getElementById("tempIdInput");
+        const macAddressInput = document.getElementById("macAddressInput");
+        const displayNameInput = document.getElementById("displayNameInput");
 
         // estado local de dispositivos
         const devicesMap = new Map();
@@ -53,13 +105,41 @@
             devicesMap.set(d.tempId, d);
         }
 
-        console.log(initialDevices);
-
         function toIsoOrDash(value) {
             if (!value) return "-";
             const dt = new Date(value);
             return isNaN(dt.getTime()) ? value : dt.toISOString();
         }
+
+        function normalizeMac(raw) {
+            return (raw ?? "")
+                .replace(/[^a-fA-F0-9]/g, "")
+                .toUpperCase();
+        }
+
+        function openRegisterModal(tempId) {
+            const normalized = normalizeMac(tempId);
+
+            tempIdInput.value = tempId ?? "";
+            macAddressInput.value = normalized;
+
+            // nombre sugerido para acelerar
+            const suffix = normalized.length >= 4 ? normalized.slice(-4) : normalized;
+            displayNameInput.value = suffix ? `Clorador ${suffix}` : "";
+
+            registerModal.show();
+        }
+
+        // delegación de evento para botones dinámicos
+        devicesBody.addEventListener("click", (e) => {
+            const btn = e.target.closest(".btn-register-device");
+            if (!btn) return;
+
+            const tempId = btn.getAttribute("data-temp-id");
+            if (!tempId) return;
+
+            openRegisterModal(tempId);
+        });
 
         function renderDevices() {
             const items = Array.from(devicesMap.values())
@@ -73,6 +153,14 @@
                     <td>${d.tempId ?? "-"}</td>
                     <td>${toIsoOrDash(d.lastSeen)}</td>
                     <td>${d.status ?? "Unregistered"}</td>
+                    <td>
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-primary btn-register-device"
+                            data-temp-id="${d.tempId ?? ""}">
+                            Registrar
+                        </button>
+                    </td>
                 `;
                 devicesBody.appendChild(tr);
             }
@@ -86,11 +174,9 @@
             .build();
 
         connection.on("NuevoDispositivo", (payload) => {
-            // payload esperado: { accion, device }
             const device = payload?.device;
             if (!device) return;
 
-            // soporta PascalCase o camelCase por robustez
             const tempId = device.tempId ?? device.TempId;
             const lastSeen = device.lastSeen ?? device.LastSeen;
             const status = device.status ?? device.Status ?? "Unregistered";
@@ -102,7 +188,6 @@
         });
 
         connection.on("DispositivoExpirado", (payload) => {
-            // payload esperado: { tempId } o string directo
             const tempId = payload?.tempId ?? payload?.TempId ?? payload;
             if (!tempId) return;
 

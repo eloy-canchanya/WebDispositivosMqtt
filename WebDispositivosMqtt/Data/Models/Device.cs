@@ -11,7 +11,17 @@ public partial class Device
 
     public string MacAddress { get; set; }
 
-    public string DisplayName { get; set; }
+    public string Name { get; set; }
 
-    public virtual ICollection<UserDevice> UserDevices { get; set; } = new List<UserDevice>();
+    public DateTime RegisteredAtUtc { get; set; }
+
+    public string RegisteredByUserId { get; set; }
+
+    public bool IsActive { get; set; }
+
+    public DateTime CreatedAtUtc { get; set; }
+
+    public DateTime UpdatedAtUtc { get; set; }
+
+    public virtual AspNetUser RegisteredByUser { get; set; }
 }

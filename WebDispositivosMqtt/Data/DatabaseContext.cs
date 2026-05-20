@@ -18,8 +18,6 @@ public partial class DatabaseContext : DbContext
 
     public virtual DbSet<Device> Devices { get; set; }
 
-    public virtual DbSet<UserDevice> UserDevices { get; set; }
-
     public virtual DbSet<ViewAspNetUser> ViewAspNetUsers { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -44,32 +42,37 @@ public partial class DatabaseContext : DbContext
 
         modelBuilder.Entity<Device>(entity =>
         {
-            entity.HasIndex(e => e.MacAddress, "UQ_Devices_MacAddress").IsUnique();
+            entity.HasKey(e => e.DeviceId).HasName("PK_Device");
 
-            entity.Property(e => e.DeviceId).HasDefaultValueSql("(newid())");
-            entity.Property(e => e.DisplayName).HasMaxLength(100);
+            entity.HasIndex(e => e.MacAddress, "UX_Device_MacAddress").IsUnique();
+
+            entity.Property(e => e.DeviceId).HasDefaultValueSql("(newid())", "DF_Device_DeviceId");
+            entity.Property(e => e.CreatedAtUtc)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())", "DF_Device_CreatedAtUtc");
+            entity.Property(e => e.IsActive).HasDefaultValue(true, "DF_Device_IsActive");
             entity.Property(e => e.MacAddress)
                 .IsRequired()
                 .HasMaxLength(12)
                 .IsUnicode(false)
                 .IsFixedLength();
-        });
+            entity.Property(e => e.Name)
+                .IsRequired()
+                .HasMaxLength(100);
+            entity.Property(e => e.RegisteredAtUtc)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())", "DF_Device_RegisteredAtUtc");
+            entity.Property(e => e.RegisteredByUserId)
+                .IsRequired()
+                .HasMaxLength(450);
+            entity.Property(e => e.UpdatedAtUtc)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())", "DF_Device_UpdatedAtUtc");
 
-        modelBuilder.Entity<UserDevice>(entity =>
-        {
-            entity.HasIndex(e => new { e.UserId, e.DeviceId }, "UQ_UserDevices_User_Device").IsUnique();
-
-            entity.Property(e => e.UserId).IsRequired();
-
-            entity.HasOne(d => d.Device).WithMany(p => p.UserDevices)
-                .HasForeignKey(d => d.DeviceId)
+            entity.HasOne(d => d.RegisteredByUser).WithMany(p => p.Devices)
+                .HasForeignKey(d => d.RegisteredByUserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_UserDevices_Devices");
-
-            entity.HasOne(d => d.User).WithMany(p => p.UserDevices)
-                .HasForeignKey(d => d.UserId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_UserDevices_AspNetUsers");
+                .HasConstraintName("FK_Device_AspNetUsers_RegisteredBy");
         });
 
         modelBuilder.Entity<ViewAspNetUser>(entity =>
