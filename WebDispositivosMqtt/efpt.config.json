@@ -23,10 +23,6 @@
          "ObjectType": 0
       },
       {
-         "Name": "[dbo].[UserDevices]",
-         "ObjectType": 0
-      },
-      {
          "Name": "[identity].[AspNetUsers]",
          "ObjectType": 0
       },

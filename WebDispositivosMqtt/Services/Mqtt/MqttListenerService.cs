@@ -72,9 +72,6 @@ namespace WebDispositivosMqtt.Services.Mqtt
 
 
 
-
-
-
             };
 
             _mqttClient.ConnectedAsync += async _ =>
@@ -156,5 +153,6 @@ namespace WebDispositivosMqtt.Services.Mqtt
 
             return builder.Build();
         }
+    
     }
 }

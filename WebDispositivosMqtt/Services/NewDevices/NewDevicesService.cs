@@ -90,16 +90,17 @@ namespace WebDispositivosMqtt.Services.NewDevices
                 }
             }
         }
+    
     }
 
 
-    public class UnregisteredCleanupWorker : BackgroundService
+    public class NewDevicesCleanupWorker : BackgroundService
     {
         private readonly INewDevicesService _service;
         //private readonly TimeSpan _ttl = TimeSpan.FromMinutes(2);
         private readonly TimeSpan _ttl = TimeSpan.FromSeconds(30);
 
-        public UnregisteredCleanupWorker(INewDevicesService service)
+        public NewDevicesCleanupWorker(INewDevicesService service)
         {
             _service = service;
         }
@@ -113,6 +114,7 @@ namespace WebDispositivosMqtt.Services.NewDevices
             }
         }
     }
+
 }
 
 
