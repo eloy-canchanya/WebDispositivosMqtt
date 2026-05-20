@@ -25,10 +25,10 @@ namespace WebDispositivosMqtt.Services.NewDevices
 
     public class NewDevicesService : INewDevicesService
     {
-        private readonly IHubContext<NewDeviceHub> _hubContext;
+        private readonly IHubContext<NewDevicesHub> _hubContext;
         private readonly ConcurrentDictionary<string, NewDevice> _devices = new();
 
-        public NewDevicesService(IHubContext<NewDeviceHub> hubContext)
+        public NewDevicesService(IHubContext<NewDevicesHub> hubContext)
         {
             _hubContext = hubContext;
         }

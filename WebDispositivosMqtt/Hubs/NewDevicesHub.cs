@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.SignalR;
 namespace WebDispositivosMqtt.Hubs
 {
-    public class NewDeviceHub : Hub
+    public class NewDevicesHub : Hub
     {
         // 🔹 Cuando un cliente se conecta
         public override async Task OnConnectedAsync()
