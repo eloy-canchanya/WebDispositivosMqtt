@@ -21,7 +21,7 @@ namespace WebDispositivosMqtt.Controllers
         public IActionResult Login(string? returnUrl = null)
         {
             if (User.Identity?.IsAuthenticated == true)
-                return RedirectToAction("Index", "Home");
+                return RedirectToAction("Index", "Devices");
 
             return View(new LoginViewModel { ReturnUrl = returnUrl });
         }
@@ -47,7 +47,7 @@ namespace WebDispositivosMqtt.Controllers
                 if (!string.IsNullOrWhiteSpace(model.ReturnUrl) && Url.IsLocalUrl(model.ReturnUrl))
                     return Redirect(model.ReturnUrl);
 
-                return RedirectToAction("Index", "Home");
+                return RedirectToAction("Index", "Devices");
             }
 
             if (result.IsLockedOut)

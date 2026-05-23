@@ -19,6 +19,10 @@ public partial class Device
 
     public bool IsEnabled { get; set; }
 
+    public string MqttCredential { get; set; }
+
+    public DateTime? ProvisioningExpiresAt { get; set; }
+
     public virtual AspNetUser RegisteredByUser { get; set; }
 
     public virtual ICollection<UserDevice> UserDevices { get; set; } = new List<UserDevice>();

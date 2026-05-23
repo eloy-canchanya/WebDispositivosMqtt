@@ -53,9 +53,13 @@ public partial class DatabaseContext : DbContext
                 .HasMaxLength(12)
                 .IsUnicode(false)
                 .IsFixedLength();
+            entity.Property(e => e.MqttCredential)
+                .HasMaxLength(500)
+                .IsUnicode(false);
             entity.Property(e => e.Name)
                 .IsRequired()
                 .HasMaxLength(100);
+            entity.Property(e => e.ProvisioningExpiresAt).HasColumnType("datetime");
             entity.Property(e => e.RegisteredAtUtc)
                 .HasPrecision(0)
                 .HasDefaultValueSql("(sysutcdatetime())", "DF_Device_RegisteredAtUtc");

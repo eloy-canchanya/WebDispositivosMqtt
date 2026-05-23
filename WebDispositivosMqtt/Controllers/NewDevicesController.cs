@@ -1,46 +1,81 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebDispositivosMqtt.Data;
 using WebDispositivosMqtt.Data.Models;
 using WebDispositivosMqtt.DataIdentity.Models;
 using WebDispositivosMqtt.Services.NewDevices;
+using WebDispositivosMqtt.Services.Provisioning;
 using WebDispositivosMqtt.Utils;
 
 namespace WebDispositivosMqtt.Controllers
 {
+    public record NewDeviceViewModel(
+        string MacAddress,
+        DateTime LastSeen,
+        string Status,
+        bool IsRegistered,
+        Guid? DeviceId,
+        DateTime? ProvisioningExpiresAt);
+
     public class NewDevicesController : Controller
     {
         private readonly INewDevicesService _unregisteredDeviceService;
         private readonly DatabaseContext _db;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IDeviceProvisioningService _provisioning;
+        private readonly int _provisioningExpirationMinutes;
 
         public NewDevicesController(
             INewDevicesService unregisteredDeviceService,
             DatabaseContext db,
-            UserManager<ApplicationUser> userManager)
+            UserManager<ApplicationUser> userManager,
+            IDeviceProvisioningService provisioning,
+            IConfiguration configuration)
         {
             _unregisteredDeviceService = unregisteredDeviceService;
             _db = db;
             _userManager = userManager;
+            _provisioning = provisioning;
+            _provisioningExpirationMinutes = configuration.GetValue<int>("Provisioning:ExpirationMinutes", 10);
         }
 
         [HttpGet]
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            var devices = _unregisteredDeviceService
+            var newDevices = _unregisteredDeviceService
                 .GetAll()
                 .OrderByDescending(d => d.LastSeen)
                 .ToList();
 
-            return View(devices);
+            var macs = newDevices.Select(d => d.MacAddress).ToHashSet();
+
+            var registered = await _db.Devices
+                .Where(d => macs.Contains(d.MacAddress))
+                .Select(d => new { d.MacAddress, d.DeviceId, d.ProvisioningExpiresAt })
+                .ToListAsync();
+
+            var registeredDict = registered.ToDictionary(d => d.MacAddress);
+
+            var viewModels = newDevices.Select(d =>
+            {
+                registeredDict.TryGetValue(d.MacAddress, out var reg);
+                return new NewDeviceViewModel(
+                    d.MacAddress,
+                    d.LastSeen,
+                    d.Status,
+                    reg is not null,
+                    reg?.DeviceId,
+                    reg?.ProvisioningExpiresAt);
+            }).ToList();
+
+            return View(viewModels);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> RegisterDevice(string tempId, string macAddress, string displayName)
         {
-            // 1) Validaciones básicas
             if (string.IsNullOrWhiteSpace(macAddress))
             {
                 TempData["Error"] = "MAC es obligatoria.";
@@ -59,7 +94,6 @@ namespace WebDispositivosMqtt.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            // 2) Evitar duplicados
             var exists = await _db.Devices.AnyAsync(d => d.MacAddress == macAddress);
             if (exists)
             {
@@ -67,11 +101,10 @@ namespace WebDispositivosMqtt.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            // 3) Insertar en tabla Devices
-
             DateTime nowUtc = DateTime.UtcNow;
-            var userId = _userManager.GetUserId(User); // Id real de AspNetUsers
+            var userId = _userManager.GetUserId(User);
 
+            var mqttCredential = _provisioning.GenerateCredential(out _);
 
             var entity = new Device
             {
@@ -80,18 +113,17 @@ namespace WebDispositivosMqtt.Controllers
                 RegisteredAtUtc = nowUtc,
                 RegisteredByUserId = userId,
                 IsEnabled = true,
+                MqttCredential = mqttCredential,
+                ProvisioningExpiresAt = nowUtc.AddMinutes(_provisioningExpirationMinutes),
             };
 
             _db.Devices.Add(entity);
             await _db.SaveChangesAsync();
 
-            // 4) Quitar de la lista temporal en memoria
             if (!string.IsNullOrWhiteSpace(tempId))
-            {
                 _unregisteredDeviceService.Remove(tempId);
-            }
 
-            TempData["Ok"] = $"Dispositivo {entity.Name} registrado correctamente.";
+            TempData["Ok"] = $"Dispositivo {entity.Name} registrado. El dispositivo tiene {_provisioningExpirationMinutes} minuto(s) para conectarse y obtener sus credenciales.";
             return RedirectToAction(nameof(Index));
         }
     }
