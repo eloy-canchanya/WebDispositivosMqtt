@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,7 +13,7 @@ namespace WebDispositivosMqtt.Controllers
         public string Name { get; set; } = default!;
         public bool IsOnline { get; set; } = false;
         public DateTime LastSeenUtc { get; set; }
-        public LastSeenType LastSeenType { get; set; }
+        public LastSeenType? LastSeenType { get; set; }
 
         public string DeviceId { get; set; } = default!;
         public string MacAddress { get; set; } = default!;
@@ -23,7 +23,7 @@ namespace WebDispositivosMqtt.Controllers
     }
 
     [Authorize]
-    public class DevicesController : Controller
+    public class DevicesController(DatabaseContext db, UserManager<ApplicationUser> userManager) : Controller
     {
         private sealed record DeviceRow(
             Guid DeviceId,
@@ -33,30 +33,16 @@ namespace WebDispositivosMqtt.Controllers
             DateTime RegisteredAtUtc,
             string? RegisteredByUserName);
 
-        private readonly IDeviceConnectionService _devConnected;
-        private readonly DatabaseContext _db;
-        private readonly UserManager<ApplicationUser> _userManager;
-
-        public DevicesController(
-            IDeviceConnectionService devConnected,
-            DatabaseContext db,
-            UserManager<ApplicationUser> userManager)
-        {
-            _devConnected = devConnected;
-            _db = db;
-            _userManager = userManager;
-        }
-
         public async Task<IActionResult> Index()
         {
-            var userId = _userManager.GetUserId(User);
+            var userId = userManager.GetUserId(User);
             var isAdmin = User.IsInRole("Admin");
 
             List<DeviceRow> dbRows;
 
             if (isAdmin)
             {
-                dbRows = await _db.Devices
+                dbRows = await db.Devices
                     .OrderByDescending(d => d.RegisteredAtUtc)
                     .Select(d => new DeviceRow(
                         d.DeviceId,
@@ -69,7 +55,7 @@ namespace WebDispositivosMqtt.Controllers
             }
             else
             {
-                dbRows = await _db.Devices
+                dbRows = await db.Devices
                     .Where(d => d.UserDevices.Any(ud => ud.UserId == userId))
                     .OrderByDescending(d => d.RegisteredAtUtc)
                     .Select(d => new DeviceRow(
@@ -82,28 +68,17 @@ namespace WebDispositivosMqtt.Controllers
                     .ToListAsync();
             }
 
-            var connections = _devConnected.GetAll();
+            var viewModels = dbRows.Select(d => new DeviceConnectionViewModel
+            {
+                DeviceId = d.DeviceId.ToString(),
+                MacAddress = d.MacAddress,
+                Name = d.Name,
+                IsEnabled = d.IsEnabled,
+                RegisteredByUserName = d.RegisteredByUserName ?? string.Empty,
+                RegisteredAtUtc = d.RegisteredAtUtc
+            }).ToList();
 
-            var devicesWithInfo =
-                from d in dbRows
-                join c in connections
-                    on d.MacAddress equals c.MacAddress
-                    into dc
-                from c in dc.DefaultIfEmpty()
-                select new DeviceConnectionViewModel
-                {
-                    DeviceId = d.DeviceId.ToString(),
-                    MacAddress = d.MacAddress,
-                    Name = d.Name,
-                    IsEnabled = d.IsEnabled,
-                    RegisteredByUserName = d.RegisteredByUserName ?? string.Empty,
-                    RegisteredAtUtc = d.RegisteredAtUtc,
-                    IsOnline = c?.IsOnline ?? false,
-                    LastSeenUtc = c?.LastSeenUtc ?? default,
-                    LastSeenType = c?.LastSeenType ?? default
-                };
-
-            return View(devicesWithInfo.ToList());
+            return View(viewModels);
         }
     }
 }
