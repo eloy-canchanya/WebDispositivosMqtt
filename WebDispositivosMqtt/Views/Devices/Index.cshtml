@@ -1,0 +1,182 @@
+@model IReadOnlyList<WebDispositivosMqtt.Controllers.DeviceConnectionViewModel>
+@{
+    ViewData["Title"] = "Dispositivos";
+    var isAdmin = User.IsInRole("Admin");
+}
+@using System.Linq
+@using System.Text.Json
+
+@functions {
+    private static string? AsUtcIso(DateTime value)
+    {
+        if (value == default) return null;
+        var utc = value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+        };
+        return utc.ToString("O");
+    }
+}
+
+@{
+    var initialDevices = Model
+        .Select(d => new
+        {
+            key = d.MacAddress ?? string.Empty,
+            isOnline = d.IsOnline,
+            lastSeenUtc = AsUtcIso(d.LastSeenUtc)
+        })
+        .ToList();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Dispositivos</h2>
+</div>
+
+<div class="mb-3">
+    <strong>Estado conexión hub:</strong>
+    <span id="hubStatus" class="badge bg-warning text-dark">Desconectado</span>
+</div>
+
+<table class="table table-striped align-middle">
+    <thead>
+        <tr>
+            <th>Nombre</th>
+            <th>Estado</th>
+            <th>Última actividad</th>
+            @if (isAdmin)
+            {
+                <th>MAC</th>
+                <th>Tipo señal</th>
+                <th>Habilitado</th>
+                <th>Registrado por</th>
+                <th>Fecha registro</th>
+            }
+        </tr>
+    </thead>
+    <tbody>
+        @if (Model.Count == 0)
+        {
+            <tr>
+                <td colspan="@(isAdmin ? 8 : 3)" class="text-center text-muted">No hay dispositivos para mostrar.</td>
+            </tr>
+        }
+        else
+        {
+            foreach (var d in Model)
+            {
+                var deviceKey = d.MacAddress ?? string.Empty;
+                <tr data-device-key="@deviceKey">
+                    <td>@(string.IsNullOrWhiteSpace(d.Name) ? "-" : d.Name)</td>
+                    <td class="device-status-cell">
+                        @if (d.IsOnline)
+                        {
+                            <span class="badge bg-success">Conectado</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Sin conexión</span>
+                        }
+                    </td>
+                    <td class="device-lastseen-cell" data-utc-datetime="@(AsUtcIso(d.LastSeenUtc) ?? "")"></td>
+                    @if (isAdmin)
+                    {
+                        <td>@(string.IsNullOrWhiteSpace(d.MacAddress) ? "-" : d.MacAddress)</td>
+                        <td>@d.LastSeenType</td>
+                        <td>@(d.IsEnabled ? "Sí" : "No")</td>
+                        <td>@(string.IsNullOrWhiteSpace(d.RegisteredByUserName) ? "-" : d.RegisteredByUserName)</td>
+                        <td data-utc-datetime="@(AsUtcIso(d.RegisteredAtUtc) ?? "")"></td>
+                    }
+                </tr>
+            }
+        }
+    </tbody>
+</table>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+    <script>
+        const hubStatus = document.getElementById("hubStatus");
+        const initialDevices = @Html.Raw(JsonSerializer.Serialize(initialDevices));
+
+        const rowsByDeviceKey = new Map();
+        const statusByDeviceKey = new Map();
+
+        document.querySelectorAll("tr[data-device-key]").forEach((row) => {
+            const key = row.getAttribute("data-device-key");
+            if (key) rowsByDeviceKey.set(key, row);
+        });
+
+        for (const d of initialDevices) {
+            if (!d.key) continue;
+            statusByDeviceKey.set(d.key, {
+                isOnline: !!d.isOnline,
+                lastSeenUtc: d.lastSeenUtc ?? null
+            });
+        }
+
+        function renderRow(key) {
+            const row = rowsByDeviceKey.get(key);
+            const state = statusByDeviceKey.get(key);
+            if (!row || !state) return;
+
+            const statusCell = row.querySelector(".device-status-cell");
+            if (statusCell) {
+                statusCell.innerHTML = state.isOnline
+                    ? '<span class="badge bg-success">Conectado</span>'
+                    : '<span class="badge bg-secondary">Sin conexión</span>';
+            }
+
+            const lastSeenCell = row.querySelector(".device-lastseen-cell");
+            if (lastSeenCell && state.lastSeenUtc) {
+                lastSeenCell.dataset.utcDatetime = state.lastSeenUtc;
+                lastSeenCell.textContent = window.appFormatUtcDateTime(state.lastSeenUtc);
+            }
+        }
+
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/Hubs/DeviceConnectionsHub")
+            .withAutomaticReconnect()
+            .build();
+
+        connection.on("EstadoDispositivoCambiado", (payload) => {
+            const macAddress = payload?.macAddress ?? payload?.MacAddress;
+            if (!macAddress || !rowsByDeviceKey.has(macAddress)) return;
+
+            statusByDeviceKey.set(macAddress, {
+                isOnline: !!(payload?.isOnline ?? payload?.IsOnline),
+                lastSeenUtc: payload?.changedAtUtc ?? payload?.ChangedAtUtc ?? null
+            });
+
+            renderRow(macAddress);
+        });
+
+        connection.onreconnecting(() => {
+            hubStatus.textContent = "Reconectando";
+            hubStatus.className = "badge bg-warning text-dark";
+        });
+
+        connection.onreconnected(() => {
+            hubStatus.textContent = "Conectado";
+            hubStatus.className = "badge bg-success";
+        });
+
+        connection.onclose(() => {
+            hubStatus.textContent = "Desconectado";
+            hubStatus.className = "badge bg-danger";
+        });
+
+        (async () => {
+            try {
+                await connection.start();
+                hubStatus.textContent = "Conectado";
+                hubStatus.className = "badge bg-success";
+            } catch {
+                hubStatus.textContent = "Error al conectar";
+                hubStatus.className = "badge bg-danger";
+            }
+        })();
+    </script>
+}

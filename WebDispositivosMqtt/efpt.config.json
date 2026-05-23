@@ -23,12 +23,12 @@
          "ObjectType": 0
       },
       {
-         "Name": "[identity].[AspNetUsers]",
+         "Name": "[dbo].[UserDevices]",
          "ObjectType": 0
       },
       {
-         "Name": "[dbo].[viewAspNetUsers]",
-         "ObjectType": 3
+         "Name": "[identity].[AspNetUsers]",
+         "ObjectType": 0
       }
    ],
    "UiHint": null,

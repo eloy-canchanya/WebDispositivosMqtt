@@ -8,6 +8,7 @@ namespace WebDispositivosMqtt.Controllers
 {
     public class AccountController : Controller
     {
+        public const string UserTimeZoneSessionKey = "UserTimeZoneId";
         private readonly SignInManager<ApplicationUser> _signInManager;
 
         public AccountController(SignInManager<ApplicationUser> signInManager)
@@ -41,6 +42,8 @@ namespace WebDispositivosMqtt.Controllers
 
             if (result.Succeeded)
             {
+                HttpContext.Session.SetString(UserTimeZoneSessionKey, GetUserTimeZoneFromDatabase(model.Email));
+
                 if (!string.IsNullOrWhiteSpace(model.ReturnUrl) && Url.IsLocalUrl(model.ReturnUrl))
                     return Redirect(model.ReturnUrl);
 
@@ -62,6 +65,7 @@ namespace WebDispositivosMqtt.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Logout()
         {
+            HttpContext.Session.Remove(UserTimeZoneSessionKey);
             await _signInManager.SignOutAsync();
             return RedirectToAction("Index", "Home");
         }
@@ -70,6 +74,12 @@ namespace WebDispositivosMqtt.Controllers
         public IActionResult AccessDenied()
         {
             return View();
+        }
+
+        private static string GetUserTimeZoneFromDatabase(string email)
+        {
+            // Simula una preferencia cargada desde base de datos al iniciar sesión.
+            return "America/Lima";
         }
     }
 }

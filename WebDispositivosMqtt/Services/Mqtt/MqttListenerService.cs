@@ -1,30 +1,32 @@
-﻿using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Options;
 using MQTTnet;
 using MQTTnet.Protocol;
-using WebDispositivosMqtt.Hubs;
+using WebDispositivosMqtt.Services.Devices;
 using WebDispositivosMqtt.Services.NewDevices;
+using WebDispositivosMqtt.Utils;
 
 namespace WebDispositivosMqtt.Services.Mqtt
 {
     public class MqttListenerService : BackgroundService
     {
+        private readonly record struct TopicParts(string Domain, string EntityId, string Resource, string? Action);
+
         private readonly MqttOptions _options;
-        private readonly IHubContext<EchoHub> _hubContext;
         private readonly ILogger<MqttListenerService> _logger;
         private IMqttClient? _mqttClient;
         private readonly INewDevicesService _newDeviceService;
+        private readonly IDeviceConnectionService _deviceConnectionService;
 
         public MqttListenerService(
             IOptions<MqttOptions> options,
-            IHubContext<EchoHub> hubContext,
             ILogger<MqttListenerService> logger,
-            INewDevicesService newDeviceService)
+            INewDevicesService newDeviceService,
+            IDeviceConnectionService devConnService)
         {
             _options = options.Value;
-            _hubContext = hubContext;
             _logger = logger;
             _newDeviceService = newDeviceService;
+            _deviceConnectionService = devConnService;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -33,42 +35,47 @@ namespace WebDispositivosMqtt.Services.Mqtt
             _mqttClient = factory.CreateMqttClient();
 
 
-            // configuracion de eventos
             _mqttClient.ApplicationMessageReceivedAsync += async eventArgs =>
             {
                 var topic = eventArgs.ApplicationMessage.Topic;
                 var payload = eventArgs.ApplicationMessage.ConvertPayloadToString() ?? string.Empty;
 
-                if (topic.StartsWith("app/unregistered"))
+
+                var segments = topic.Split('/', StringSplitOptions.RemoveEmptyEntries);
+ 
+                if (segments.Length is < 3 or > 4)
                 {
-                    var parts = topic.Split('/');
+                    return;
+                }
 
-                    // app/unregistered/{mac}/register
-                    var tempId = parts.Length > 2 ? parts[2] : null;
+                string domain = segments[0];
+                string entityId = segments[1];
+                string resource = segments[2];
+                string acknowledge = segments.Length > 3 ? segments[3] : string.Empty;
 
-                    if (!string.IsNullOrEmpty(tempId))
-                    {
-                        await _newDeviceService.AddOrUpdateAsync(tempId);
-                    }
 
-                    return; // 🔥 IMPORTANTE: no seguir procesando
+                if (domain != "devices")
+                {
+                    return;
+                }
+
+                if (!DeviceMac.IsValid(entityId))
+                {
+                    _logger.LogWarning("Topic descartado por MAC inválida. Topic: {Topic}", topic);
+                    return;
+                }
+
+                if (resource == "register")
+                {
+                    await _newDeviceService.AddOrUpdateAsync(entityId);
+                    return;
                 }
                 else
                 {
-
-                    var fecha = DateTime.Now.ToString("HH:mm:ss");
-
-                    _logger.LogInformation("MQTT recibido. Topic: {Topic} Payload: {Payload}", topic, payload);
-
-                    await _hubContext.Clients.All.SendAsync(
-                        "RecibirMensajeMqtt",
-                        topic,
-                        payload,
-                        fecha,
-                        cancellationToken: stoppingToken);
-
-
+                    await _deviceConnectionService.EvaluateTopicAsync(domain, entityId, resource, acknowledge, payload);
                 }
+
+                _logger.LogInformation("MQTT recibido. Topic: {Topic} Payload: {Payload}", topic, payload);
 
 
 
@@ -78,7 +85,7 @@ namespace WebDispositivosMqtt.Services.Mqtt
             {
                 _logger.LogInformation("Conectado al broker MQTT {Host}:{Port}", _options.Host, _options.Port);
 
-                foreach (var topic in _options.Topics)
+                foreach (var topic in _options.SubscribeTopics)
                 {
                     await _mqttClient.SubscribeAsync(
                         new MqttTopicFilterBuilder()
@@ -153,6 +160,7 @@ namespace WebDispositivosMqtt.Services.Mqtt
 
             return builder.Build();
         }
-    
+
+
     }
 }

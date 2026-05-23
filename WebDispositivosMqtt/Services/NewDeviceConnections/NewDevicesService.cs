@@ -6,7 +6,7 @@ namespace WebDispositivosMqtt.Services.NewDevices
 {
     public class NewDevice
     {
-        public string TempId { get; set; } = default!; // MAC o derivado
+        public string MacAddress { get; set; } = default!;
         public DateTime LastSeen { get; set; }
         public string Status { get; set; } = "Unregistered";
     }
@@ -25,10 +25,10 @@ namespace WebDispositivosMqtt.Services.NewDevices
 
     public class NewDevicesService : INewDevicesService
     {
-        private readonly IHubContext<NewDevicesHub> _hubContext;
+        private readonly IHubContext<NewDeviceConnectionsHub> _hubContext;
         private readonly ConcurrentDictionary<string, NewDevice> _devices = new();
 
-        public NewDevicesService(IHubContext<NewDevicesHub> hubContext)
+        public NewDevicesService(IHubContext<NewDeviceConnectionsHub> hubContext)
         {
             _hubContext = hubContext;
         }
@@ -45,7 +45,7 @@ namespace WebDispositivosMqtt.Services.NewDevices
                     accion = "created";
                     return new NewDevice
                     {
-                        TempId = key,
+                        MacAddress = key,
                         LastSeen = now
                     };
                 },
@@ -85,7 +85,7 @@ namespace WebDispositivosMqtt.Services.NewDevices
                 {
                     await _hubContext.Clients.All.SendAsync("DispositivoExpirado", new
                     {
-                        tempId = removed!.TempId
+                        macAddress = removed!.MacAddress
                     });
                 }
             }
