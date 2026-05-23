@@ -62,7 +62,7 @@ namespace WebDispositivosMqtt.Controllers
             if (result.Succeeded)
             {
                 TempData["Ok"] = "Usuario creado correctamente.";
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction("Index", "Devices");
             }
 
             foreach (var error in result.Errors)

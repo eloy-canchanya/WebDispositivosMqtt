@@ -5,9 +5,19 @@ using Microsoft.EntityFrameworkCore;
 using WebDispositivosMqtt.Data;
 using WebDispositivosMqtt.DataIdentity.Models;
 using WebDispositivosMqtt.Services.Devices;
+using WebDispositivosMqtt.Services.Provisioning;
 
 namespace WebDispositivosMqtt.Controllers
 {
+    public record DeviceAdminViewModel(
+        Guid DeviceId,
+        string MacAddress,
+        string Name,
+        bool IsEnabled,
+        DateTime RegisteredAtUtc,
+        string RegisteredByUserName,
+        DateTime? ProvisioningExpiresAt);
+
     public record DeviceConnectionViewModel
     {
         public string Name { get; set; } = default!;
@@ -23,7 +33,10 @@ namespace WebDispositivosMqtt.Controllers
     }
 
     [Authorize]
-    public class DevicesController(DatabaseContext db, UserManager<ApplicationUser> userManager) : Controller
+    public class DevicesController(
+        DatabaseContext db,
+        UserManager<ApplicationUser> userManager,
+        IDeviceProvisioningService provisioning) : Controller
     {
         private sealed record DeviceRow(
             Guid DeviceId,
@@ -79,6 +92,46 @@ namespace WebDispositivosMqtt.Controllers
             }).ToList();
 
             return View(viewModels);
+        }
+
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Admin()
+        {
+            var devices = await db.Devices
+                .OrderByDescending(d => d.RegisteredAtUtc)
+                .Select(d => new DeviceAdminViewModel(
+                    d.DeviceId,
+                    d.MacAddress,
+                    d.Name,
+                    d.IsEnabled,
+                    d.RegisteredAtUtc,
+                    d.RegisteredByUser!.UserName ?? "",
+                    d.ProvisioningExpiresAt))
+                .ToListAsync();
+
+            return View(devices);
+        }
+
+        [HttpPost]
+        [Authorize(Roles = "Admin")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResetProvisioning(Guid deviceId)
+        {
+            var device = await db.Devices.FindAsync(deviceId);
+
+            if (device is null || !device.IsEnabled)
+            {
+                TempData["Error"] = "Dispositivo no encontrado.";
+                return RedirectToAction(nameof(Admin));
+            }
+
+            device.MqttCredential = provisioning.GenerateCredential(out _);
+            device.ProvisioningExpiresAt = DateTime.UtcNow.AddMinutes(10);
+
+            await db.SaveChangesAsync();
+
+            TempData["Ok"] = $"Credenciales regeneradas para {device.Name}. El dispositivo tiene 10 minutos para provisionarse.";
+            return RedirectToAction(nameof(Admin));
         }
     }
 }

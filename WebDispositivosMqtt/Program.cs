@@ -7,6 +7,7 @@ using WebDispositivosMqtt.Data;
 using WebDispositivosMqtt.Services.Mqtt;
 using WebDispositivosMqtt.Services.NewDevices;
 using WebDispositivosMqtt.Services.Devices;
+using WebDispositivosMqtt.Services.Provisioning;
 
 namespace WebDispositivosMqtt
 {
@@ -63,6 +64,9 @@ namespace WebDispositivosMqtt
             builder.Services.AddSingleton<IDeviceConnectionService, DeviceConnectionService>();
             builder.Services.AddHostedService<DeviceConnectionCleanupWorker>();
 
+            // Servicio de provisioning MQTT para ESP32
+            builder.Services.AddScoped<IDeviceProvisioningService, DeviceProvisioningService>();
+
 
             var app = builder.Build();
 
@@ -92,6 +96,9 @@ namespace WebDispositivosMqtt
             // rutas SignalR
             app.MapHub<NewDeviceConnectionsHub>("/Hubs/NewDeviceConnectionsHub");
             app.MapHub<DeviceConnectionsHub>("/Hubs/DeviceConnectionsHub");
+
+            // Rutas API (controllers con [ApiController])
+            app.MapControllers();
 
             if (app.Environment.IsDevelopment())
             {

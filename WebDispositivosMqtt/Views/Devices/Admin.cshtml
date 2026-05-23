@@ -1,0 +1,120 @@
+@model IReadOnlyCollection<WebDispositivosMqtt.Controllers.DeviceAdminViewModel>
+
+@{
+    ViewData["Title"] = "Administración de dispositivos";
+}
+
+@functions {
+    private static string? AsUtcIso(DateTime? value)
+    {
+        if (value is null) return null;
+        var utc = value.Value.Kind switch
+        {
+            DateTimeKind.Utc   => value.Value,
+            DateTimeKind.Local => value.Value.ToUniversalTime(),
+            _                  => DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)
+        };
+        return utc.ToString("O");
+    }
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Administración de dispositivos</h2>
+</div>
+
+@if (TempData["Ok"] is string okMsg)
+{
+    <div class="alert alert-success">@okMsg</div>
+}
+@if (TempData["Error"] is string errMsg)
+{
+    <div class="alert alert-danger">@errMsg</div>
+}
+
+<table class="table table-striped align-middle">
+    <thead>
+        <tr>
+            <th>Nombre</th>
+            <th>MAC</th>
+            <th>Habilitado</th>
+            <th>Provisionamiento</th>
+            <th>Registrado por</th>
+            <th>Fecha registro</th>
+            <th style="width:180px;">Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (!Model.Any())
+        {
+            <tr>
+                <td colspan="7" class="text-center text-muted">No hay dispositivos registrados.</td>
+            </tr>
+        }
+        else
+        {
+            foreach (var d in Model)
+            {
+                <tr>
+                    <td>@d.Name</td>
+                    <td><code>@d.MacAddress</code></td>
+                    <td>@(d.IsEnabled ? "Sí" : "No")</td>
+                    <td>
+                        @if (d.ProvisioningExpiresAt is null)
+                        {
+                            <span class="badge bg-success">Provisionado</span>
+                        }
+                        else if (d.ProvisioningExpiresAt > DateTime.UtcNow)
+                        {
+                            <span class="badge bg-warning text-dark"
+                                  data-countdown="@AsUtcIso(d.ProvisioningExpiresAt)">
+                                Calculando...
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-danger">Ventana expirada</span>
+                        }
+                    </td>
+                    <td>@d.RegisteredByUserName</td>
+                    <td data-utc-datetime="@(AsUtcIso(d.RegisteredAtUtc) ?? "")"></td>
+                    <td>
+                        <form method="post"
+                              asp-controller="Devices"
+                              asp-action="ResetProvisioning"
+                              onsubmit="return confirm('¿Regenerar credenciales de @d.Name? La contraseña actual quedará inválida.')">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="deviceId" value="@d.DeviceId" />
+                            <button type="submit" class="btn btn-sm btn-warning">
+                                Regenerar credenciales
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        }
+    </tbody>
+</table>
+
+@section Scripts {
+    <script>
+        // Countdown en tiempo real para ventanas abiertas
+        function updateCountdowns() {
+            document.querySelectorAll("[data-countdown]").forEach(el => {
+                const exp = new Date(el.dataset.countdown);
+                const secs = Math.floor((exp - new Date()) / 1000);
+                if (secs <= 0) {
+                    el.className = "badge bg-danger";
+                    el.textContent = "Ventana expirada";
+                    el.removeAttribute("data-countdown");
+                } else {
+                    const m = Math.floor(secs / 60).toString().padStart(2, "0");
+                    const s = (secs % 60).toString().padStart(2, "0");
+                    el.textContent = `⏳ Ventana abierta ${m}:${s}`;
+                }
+            });
+        }
+
+        updateCountdowns();
+        setInterval(updateCountdowns, 1000);
+    </script>
+}
