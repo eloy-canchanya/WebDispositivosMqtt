@@ -38,4 +38,6 @@ public partial class AspNetUser
     public int AccessFailedCount { get; set; }
 
     public virtual ICollection<Device> Devices { get; set; } = new List<Device>();
+
+    public virtual ICollection<UserDevice> UserDevices { get; set; } = new List<UserDevice>();
 }

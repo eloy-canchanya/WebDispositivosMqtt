@@ -1,12 +1,29 @@
-﻿@model IReadOnlyCollection<WebDispositivosMqtt.Services.NewDevices.NewDevice>
+@model IReadOnlyCollection<WebDispositivosMqtt.Services.NewDevices.NewDevice>
 
 @{
     ViewData["Title"] = "Nuevos dispositivos";
+}
+
+@functions {
+    private static string AsUtcIso(DateTime value)
+    {
+        var utc = value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+        };
+
+        return utc.ToString("O");
+    }
+}
+
+@{
     var initialDevices = Model
         .Select(d => new
         {
-            tempId = d.TempId,
-            lastSeen = d.LastSeen,
+            macAddress = d.MacAddress,
+            lastSeenUtc = AsUtcIso(d.LastSeen),
             status = d.Status
         })
         .ToList();
@@ -36,8 +53,8 @@
         <table class="table table-striped table-bordered align-middle">
             <thead>
                 <tr>
-                    <th>TempId</th>
-                    <th>LastSeen (UTC)</th>
+                    <th>MAC</th>
+                    <th>LastSeen</th>
                     <th>Status</th>
                     <th style="width: 140px;">Acción</th>
                 </tr>
@@ -102,29 +119,15 @@
         // carga inicial desde el servidor
         const initialDevices = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(initialDevices));
         for (const d of initialDevices) {
-            devicesMap.set(d.tempId, d);
+            devicesMap.set(d.macAddress, d);
         }
 
-        function toIsoOrDash(value) {
-            if (!value) return "-";
-            const dt = new Date(value);
-            return isNaN(dt.getTime()) ? value : dt.toISOString();
-        }
-
-        function normalizeMac(raw) {
-            return (raw ?? "")
-                .replace(/[^a-fA-F0-9]/g, "")
-                .toUpperCase();
-        }
-
-        function openRegisterModal(tempId) {
-            const normalized = normalizeMac(tempId);
-
-            tempIdInput.value = tempId ?? "";
-            macAddressInput.value = normalized;
+        function openRegisterModal(macAddress) {
+            tempIdInput.value = macAddress ?? "";
+            macAddressInput.value = macAddress ?? "";
 
             // nombre sugerido para acelerar
-            const suffix = normalized.length >= 4 ? normalized.slice(-4) : normalized;
+            const suffix = (macAddress ?? "").length >= 4 ? macAddress.slice(-4) : (macAddress ?? "");
             displayNameInput.value = suffix ? `Clorador ${suffix}` : "";
 
             registerModal.show();
@@ -135,29 +138,29 @@
             const btn = e.target.closest(".btn-register-device");
             if (!btn) return;
 
-            const tempId = btn.getAttribute("data-temp-id");
-            if (!tempId) return;
+            const macAddress = btn.getAttribute("data-mac-address");
+            if (!macAddress) return;
 
-            openRegisterModal(tempId);
+            openRegisterModal(macAddress);
         });
 
         function renderDevices() {
             const items = Array.from(devicesMap.values())
-                .sort((a, b) => new Date(b.lastSeen) - new Date(a.lastSeen));
+                .sort((a, b) => new Date(b.lastSeenUtc) - new Date(a.lastSeenUtc));
 
             devicesBody.innerHTML = "";
 
             for (const d of items) {
                 const tr = document.createElement("tr");
                 tr.innerHTML = `
-                    <td>${d.tempId ?? "-"}</td>
-                    <td>${toIsoOrDash(d.lastSeen)}</td>
+                    <td>${d.macAddress ?? "-"}</td>
+                    <td data-utc-datetime="${d.lastSeenUtc ?? ""}">${window.appFormatUtcDateTime(d.lastSeenUtc)}</td>
                     <td>${d.status ?? "Unregistered"}</td>
                     <td>
                         <button
                             type="button"
                             class="btn btn-sm btn-primary btn-register-device"
-                            data-temp-id="${d.tempId ?? ""}">
+                            data-mac-address="${d.macAddress ?? ""}">
                             Registrar
                         </button>
                     </td>
@@ -169,7 +172,7 @@
         renderDevices();
 
         const connection = new signalR.HubConnectionBuilder()
-            .withUrl("/Hubs/NewDeviceHub")
+        .withUrl("/Hubs/NewDeviceConnectionsHub")
             .withAutomaticReconnect()
             .build();
 
@@ -177,21 +180,21 @@
             const device = payload?.device;
             if (!device) return;
 
-            const tempId = device.tempId ?? device.TempId;
-            const lastSeen = device.lastSeen ?? device.LastSeen;
+            const macAddress = device.macAddress ?? device.MacAddress;
+            const lastSeenUtc = device.lastSeen ?? device.LastSeen ?? device.lastSeenUtc ?? device.LastSeenUtc;
             const status = device.status ?? device.Status ?? "Unregistered";
 
-            if (!tempId) return;
+            if (!macAddress) return;
 
-            devicesMap.set(tempId, { tempId, lastSeen, status });
+            devicesMap.set(macAddress, { macAddress, lastSeenUtc, status });
             renderDevices();
         });
 
         connection.on("DispositivoExpirado", (payload) => {
-            const tempId = payload?.tempId ?? payload?.TempId ?? payload;
-            if (!tempId) return;
+            const macAddress = payload?.macAddress ?? payload?.MacAddress ?? payload;
+            if (!macAddress) return;
 
-            if (devicesMap.delete(tempId)) {
+            if (devicesMap.delete(macAddress)) {
                 renderDevices();
             }
         });
@@ -223,4 +226,3 @@
         })();
     </script>
 }
-

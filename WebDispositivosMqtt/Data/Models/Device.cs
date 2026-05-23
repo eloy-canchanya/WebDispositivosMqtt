@@ -17,11 +17,9 @@ public partial class Device
 
     public string RegisteredByUserId { get; set; }
 
-    public bool IsActive { get; set; }
-
-    public DateTime CreatedAtUtc { get; set; }
-
-    public DateTime UpdatedAtUtc { get; set; }
+    public bool IsEnabled { get; set; }
 
     public virtual AspNetUser RegisteredByUser { get; set; }
+
+    public virtual ICollection<UserDevice> UserDevices { get; set; } = new List<UserDevice>();
 }

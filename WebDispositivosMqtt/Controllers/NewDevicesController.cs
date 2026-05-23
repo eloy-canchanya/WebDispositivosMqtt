@@ -5,6 +5,7 @@ using WebDispositivosMqtt.Data;
 using WebDispositivosMqtt.Data.Models;
 using WebDispositivosMqtt.DataIdentity.Models;
 using WebDispositivosMqtt.Services.NewDevices;
+using WebDispositivosMqtt.Utils;
 
 namespace WebDispositivosMqtt.Controllers
 {
@@ -52,19 +53,17 @@ namespace WebDispositivosMqtt.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            var normalizedMac = NormalizeMac(macAddress);
-
-            if (normalizedMac.Length != 12 || normalizedMac.Any(c => !Uri.IsHexDigit(c)))
+            if (!DeviceMac.IsValid(macAddress))
             {
-                TempData["Error"] = "La MAC debe tener 12 caracteres hexadecimales.";
+                TempData["Error"] = "La MAC debe tener exactamente 12 caracteres hexadecimales en mayúsculas, sin separadores.";
                 return RedirectToAction(nameof(Index));
             }
 
             // 2) Evitar duplicados
-            var exists = await _db.Devices.AnyAsync(d => d.MacAddress == normalizedMac);
+            var exists = await _db.Devices.AnyAsync(d => d.MacAddress == macAddress);
             if (exists)
             {
-                TempData["Error"] = $"Ya existe un dispositivo con MAC {normalizedMac}.";
+                TempData["Error"] = $"Ya existe un dispositivo con MAC {macAddress}.";
                 return RedirectToAction(nameof(Index));
             }
 
@@ -76,16 +75,12 @@ namespace WebDispositivosMqtt.Controllers
 
             var entity = new Device
             {
-                MacAddress = normalizedMac,
+                MacAddress = macAddress,
                 Name = displayName.Trim(),
                 RegisteredAtUtc = nowUtc,
                 RegisteredByUserId = userId,
-                IsActive = true,
-                CreatedAtUtc = nowUtc,
-                // UpdatedAtUtc = nowUtc
-
+                IsEnabled = true,
             };
-
 
             _db.Devices.Add(entity);
             await _db.SaveChangesAsync();
@@ -94,22 +89,10 @@ namespace WebDispositivosMqtt.Controllers
             if (!string.IsNullOrWhiteSpace(tempId))
             {
                 _unregisteredDeviceService.Remove(tempId);
-                if (tempId != normalizedMac)
-                {
-                    _unregisteredDeviceService.Remove(normalizedMac);
-                }
             }
 
             TempData["Ok"] = $"Dispositivo {entity.Name} registrado correctamente.";
             return RedirectToAction(nameof(Index));
-        }
-
-        private static string NormalizeMac(string mac)
-        {
-            return new string(mac
-                .Where(c => Uri.IsHexDigit(c))
-                .Select(char.ToUpperInvariant)
-                .ToArray());
         }
     }
 }

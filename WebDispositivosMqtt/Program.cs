@@ -1,12 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using WebDispositivosMqtt.Hubs;
-using WebDispositivosMqtt.Services;
 using WebDispositivosMqtt.Identity;
 using WebDispositivosMqtt.DataIdentity.Models;
 using WebDispositivosMqtt.Data;
 using WebDispositivosMqtt.Services.Mqtt;
 using WebDispositivosMqtt.Services.NewDevices;
+using WebDispositivosMqtt.Services.Devices;
 
 namespace WebDispositivosMqtt
 {
@@ -19,6 +19,8 @@ namespace WebDispositivosMqtt
             // Add services to the container.
             // MVC
             builder.Services.AddControllersWithViews();
+            builder.Services.AddDistributedMemoryCache();
+            builder.Services.AddSession();
 
             // EF core + Identity
             builder.Services.AddDbContext<IdentityAppDbContext>(options =>
@@ -49,9 +51,6 @@ namespace WebDispositivosMqtt
             //SignalR
             builder.Services.AddSignalR();
 
-            // singleton para contar conexiones
-            builder.Services.AddSingleton<ConnectionTracker>();
-
             // Servicio mqtt
             builder.Services.Configure<MqttOptions>(builder.Configuration.GetSection("Mqtt"));
             builder.Services.AddHostedService<MqttListenerService>();
@@ -59,6 +58,11 @@ namespace WebDispositivosMqtt
             // Servicio para registrar dispositivos nuevos
             builder.Services.AddSingleton<INewDevicesService, NewDevicesService>();
             builder.Services.AddHostedService<NewDevicesCleanupWorker>();
+
+            // Servicio de dispositivos conectados
+            builder.Services.AddSingleton<IDeviceConnectionService, DeviceConnectionService>();
+            builder.Services.AddHostedService<DeviceConnectionCleanupWorker>();
+
 
             var app = builder.Build();
 
@@ -72,6 +76,7 @@ namespace WebDispositivosMqtt
 
             app.UseHttpsRedirection();
             app.UseRouting();
+            app.UseSession();
 
             app.UseAuthentication();
             app.UseAuthorization();
@@ -85,8 +90,8 @@ namespace WebDispositivosMqtt
                 .WithStaticAssets();
 
             // rutas SignalR
-            app.MapHub<EchoHub>("/Hubs/EchoHub");
-            app.MapHub<NewDevicesHub>("/Hubs/NewDeviceHub");
+            app.MapHub<NewDeviceConnectionsHub>("/Hubs/NewDeviceConnectionsHub");
+            app.MapHub<DeviceConnectionsHub>("/Hubs/DeviceConnectionsHub");
 
             if (app.Environment.IsDevelopment())
             {
