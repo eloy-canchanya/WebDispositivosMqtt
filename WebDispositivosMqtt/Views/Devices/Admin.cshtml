@@ -37,9 +37,9 @@
             <th>Nombre</th>
             <th>MAC</th>
             <th>Habilitado</th>
-            <th>Provisionamiento</th>
             <th>Registrado por</th>
             <th>Fecha registro</th>
+            <th>Provisionamiento</th>
             <th style="width:180px;">Acciones</th>
         </tr>
     </thead>
@@ -58,6 +58,8 @@
                     <td>@d.Name</td>
                     <td><code>@d.MacAddress</code></td>
                     <td>@(d.IsEnabled ? "Sí" : "No")</td>
+                    <td>@d.RegisteredByUserName</td>
+                    <td data-utc-datetime="@(AsUtcIso(d.RegisteredAtUtc) ?? "")"></td>
                     <td>
                         @if (d.ProvisioningExpiresAt is null)
                         {
@@ -75,8 +77,6 @@
                             <span class="badge bg-danger">Ventana expirada</span>
                         }
                     </td>
-                    <td>@d.RegisteredByUserName</td>
-                    <td data-utc-datetime="@(AsUtcIso(d.RegisteredAtUtc) ?? "")"></td>
                     <td>
                         <form method="post"
                               asp-controller="Devices"

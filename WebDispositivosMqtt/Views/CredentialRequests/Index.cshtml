@@ -1,0 +1,299 @@
+@{
+    ViewData["Title"] = "Solicitudes de credenciales";
+}
+
+<div class="row">
+    <div class="col-md-11">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h1 class="display-6 mb-0">Solicitudes de credenciales</h1>
+            <span id="hubStatus" class="badge bg-warning text-dark">Desconectado</span>
+        </div>
+
+        <table class="table table-bordered align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>MAC</th>
+                    <th>Clave</th>
+                    <th>Solicitado</th>
+                    <th>Estado</th>
+                    <th>Dispositivo</th>
+                    <th style="width:220px">Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="requestsBody">
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">No hay solicitudes pendientes</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Toast container -->
+<div id="toastContainer" class="position-fixed bottom-0 end-0 p-3" style="z-index:9999"></div>
+
+<!-- Modal registro -->
+<div class="modal fade" id="registerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Registrar dispositivo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">MAC</label>
+                    <input type="text" class="form-control" id="modalMac" readonly />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Nombre del dispositivo</label>
+                    <input type="text" class="form-control" id="modalName" maxlength="100" required />
+                </div>
+                <input type="hidden" id="modalId" />
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmRegister">Registrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+    <script>
+        const requestsBody    = document.getElementById('requestsBody');
+        const hubStatus       = document.getElementById('hubStatus');
+        const toastContainer  = document.getElementById('toastContainer');
+        const registerModalEl = document.getElementById('registerModal');
+        const registerModal   = new bootstrap.Modal(registerModalEl);
+        const modalMac        = document.getElementById('modalMac');
+        const modalName       = document.getElementById('modalName');
+        const modalId         = document.getElementById('modalId');
+        const confirmRegisterBtn = document.getElementById('confirmRegister');
+
+        // Clave: id (guid string) — múltiples entradas por MAC permitidas
+        const requestsMap = new Map();
+
+        function isHistorical(status) {
+            return status === 'Cancelled' || status === 'Provisioned';
+        }
+
+        // ---- Toasts ----
+        function showToast(message, type = 'success') {
+            const id = 'toast-' + Date.now();
+            const bg = type === 'success' ? 'bg-success' : type === 'danger' ? 'bg-danger' : 'bg-warning text-dark';
+            toastContainer.insertAdjacentHTML('beforeend', `
+                <div id="${id}" class="toast text-white ${bg}" role="alert">
+                    <div class="d-flex">
+                        <div class="toast-body">${message}</div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                    </div>
+                </div>`);
+            const el = document.getElementById(id);
+            new bootstrap.Toast(el, { delay: 5000 }).show();
+            el.addEventListener('hidden.bs.toast', () => el.remove());
+        }
+
+        // ---- Badges ----
+        function statusBadge(status) {
+            if (status === 'Pending')     return '<span class="badge bg-warning text-dark">Pendiente</span>';
+            if (status === 'Approved')    return '<span class="badge bg-success">Aprobado</span>';
+            if (status === 'Cancelled')   return '<span class="badge bg-danger">Cancelado</span>';
+            if (status === 'Provisioned') return '<span class="badge bg-primary">Provisionado</span>';
+            return `<span class="badge bg-secondary">${status}</span>`;
+        }
+
+        function deviceBadge(r) {
+            if (!r.isRegistered) return '<span class="badge bg-secondary">Nuevo</span>';
+            return `<span class="badge bg-info text-dark" title="${r.deviceName ?? ''}">${r.deviceName ?? 'Registrado'}</span>`;
+        }
+
+        function actionButtons(r) {
+            // Filas históricas: solo lectura, sin botones
+            if (isHistorical(r.status)) return '';
+
+            const cancelBtn = `<button class="btn btn-sm btn-outline-danger" onclick="cancelRequest('${r.id}')">Cancelar</button>`;
+
+            if (r.status === 'Approved')
+                return `<span class="text-muted small me-2">Esperando dispositivo...</span>${cancelBtn}`;
+
+            let html = '';
+            if (!r.isRegistered) {
+                html += `<button class="btn btn-sm btn-primary me-1" onclick="openRegisterModal('${r.id}', '${r.macAddress}')">Registrar</button>`;
+            } else {
+                html += `<button class="btn btn-sm btn-success me-1" onclick="approveRequest('${r.id}')">Aprobar</button>`;
+            }
+            return html + cancelBtn;
+        }
+
+        // ---- Render ----
+        function renderRequests() {
+            const items = Array.from(requestsMap.values())
+                .sort((a, b) => new Date(b.createdAtUtc) - new Date(a.createdAtUtc));
+
+            if (items.length === 0) {
+                requestsBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No hay solicitudes pendientes</td></tr>';
+                return;
+            }
+
+            requestsBody.innerHTML = '';
+            for (const r of items) {
+                const tr = document.createElement('tr');
+                tr.id = `row-${r.id}`;
+                if (isHistorical(r.status)) tr.classList.add('table-secondary');
+                tr.innerHTML = `
+                    <td><code>${r.macAddress}</code></td>
+                    <td><strong>${r.keyword}</strong></td>
+                    <td data-utc-datetime="${r.createdAtUtc}">${window.appFormatUtcDateTime(r.createdAtUtc)}</td>
+                    <td>${statusBadge(r.status)}</td>
+                    <td>${deviceBadge(r)}</td>
+                    <td>${actionButtons(r)}</td>
+                `;
+                requestsBody.appendChild(tr);
+            }
+        }
+
+        // ---- Carga inicial ----
+        async function loadRequests() {
+            try {
+                const res = await fetch('/api/device-requests');
+                if (!res.ok) return;
+                const data = await res.json();
+                requestsMap.clear();
+                for (const r of data) requestsMap.set(r.id, r);
+                renderRequests();
+            } catch { }
+        }
+
+        // ---- Modal registro ----
+        function openRegisterModal(id, mac) {
+            modalId.value  = id;
+            modalMac.value = mac;
+            const suffix = mac.length >= 4 ? mac.slice(-4) : mac;
+            modalName.value = `Clorador ${suffix}`;
+            registerModal.show();
+            setTimeout(() => modalName.select(), 300);
+        }
+
+        confirmRegisterBtn.addEventListener('click', async () => {
+            const id   = modalId.value;
+            const name = modalName.value.trim();
+            if (!name) { modalName.focus(); return; }
+
+            confirmRegisterBtn.disabled = true;
+            try {
+                const res  = await fetch(`/api/device-requests/${id}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    const r = requestsMap.get(id);
+                    if (r) {
+                        r.status               = 'Approved';
+                        r.isRegistered         = true;
+                        r.deviceName           = data.deviceName;
+                        r.deviceId             = data.deviceId;
+                        r.provisioningExpiresAt = data.provisioningExpiresAt;
+                    }
+                    renderRequests();
+                    registerModal.hide();
+                    showToast(`Dispositivo "${data.deviceName}" registrado. Ventana abierta 10 min.`);
+                } else {
+                    showToast(data.error ?? 'Error al registrar.', 'danger');
+                }
+            } catch {
+                showToast('Error de red.', 'danger');
+            } finally {
+                confirmRegisterBtn.disabled = false;
+            }
+        });
+
+        // ---- Aprobar (dispositivo ya registrado) ----
+        async function approveRequest(id) {
+            try {
+                const res  = await fetch(`/api/device-requests/${id}/approve`, { method: 'POST' });
+                const data = await res.json();
+                if (res.ok) {
+                    const r = requestsMap.get(id);
+                    if (r) { r.status = 'Approved'; r.provisioningExpiresAt = data.provisioningExpiresAt; }
+                    renderRequests();
+                    showToast(`Ventana abierta para "${data.deviceName}". 10 min para conectarse.`);
+                } else {
+                    showToast(data.error ?? 'Error al aprobar.', 'danger');
+                }
+            } catch {
+                showToast('Error de red.', 'danger');
+            }
+        }
+
+        // ---- Cancelar ----
+        async function cancelRequest(id) {
+            try {
+                const res = await fetch(`/api/device-requests/${id}`, { method: 'DELETE' });
+                if (!res.ok) {
+                    const data = await res.json();
+                    showToast(data.error ?? 'Error al cancelar.', 'danger');
+                }
+                // La fila se actualiza via SignalR (SolicitudCancelada)
+            } catch {
+                showToast('Error de red.', 'danger');
+            }
+        }
+
+        // ---- SignalR ----
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl('/Hubs/NewDeviceConnectionsHub')
+            .withAutomaticReconnect()
+            .build();
+
+        connection.on('SolicitudCredencial', (payload) => {
+            requestsMap.set(payload.id, {
+                id:                    payload.id,
+                macAddress:            payload.macAddress,
+                keyword:               payload.keyword,
+                createdAtUtc:          payload.createdAtUtc,
+                status:                payload.status,
+                isRegistered:          payload.isRegistered,
+                deviceId:              null,
+                deviceName:            null,
+                provisioningExpiresAt: null
+            });
+            renderRequests();
+            showToast(`Nueva solicitud de ${payload.macAddress} — clave: <strong>${payload.keyword}</strong>`);
+        });
+
+        connection.on('SolicitudCancelada', (payload) => {
+            const r = requestsMap.get(payload.id);
+            if (r) { r.status = 'Cancelled'; renderRequests(); }
+        });
+
+        connection.on('SolicitudProvisionada', (payload) => {
+            const r = requestsMap.get(payload.id);
+            if (r) { r.status = 'Provisioned'; renderRequests(); }
+        });
+
+        connection.on('SolicitudExpirada', (payload) => {
+            if (requestsMap.delete(payload.id)) renderRequests();
+        });
+
+        connection.onreconnecting(() => { hubStatus.textContent = 'Reconectando'; hubStatus.className = 'badge bg-warning text-dark'; });
+        connection.onreconnected(() => { hubStatus.textContent = 'Conectado'; hubStatus.className = 'badge bg-success'; });
+        connection.onclose(() => { hubStatus.textContent = 'Desconectado'; hubStatus.className = 'badge bg-danger'; });
+
+        (async () => {
+            try {
+                await connection.start();
+                hubStatus.textContent = 'Conectado';
+                hubStatus.className = 'badge bg-success';
+            } catch {
+                hubStatus.textContent = 'Error al conectar';
+                hubStatus.className = 'badge bg-danger';
+            } finally {
+                await loadRequests();
+            }
+        })();
+    </script>
+}
