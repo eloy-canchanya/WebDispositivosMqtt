@@ -5,9 +5,9 @@ using WebDispositivosMqtt.Identity;
 using WebDispositivosMqtt.DataIdentity.Models;
 using WebDispositivosMqtt.Data;
 using WebDispositivosMqtt.Services.Mqtt;
-using WebDispositivosMqtt.Services.NewDevices;
 using WebDispositivosMqtt.Services.Devices;
 using WebDispositivosMqtt.Services.Provisioning;
+using WebDispositivosMqtt.Services.DeviceRequests;
 
 namespace WebDispositivosMqtt
 {
@@ -56,9 +56,10 @@ namespace WebDispositivosMqtt
             builder.Services.Configure<MqttOptions>(builder.Configuration.GetSection("Mqtt"));
             builder.Services.AddHostedService<MqttListenerService>();
 
-            // Servicio para registrar dispositivos nuevos
-            builder.Services.AddSingleton<INewDevicesService, NewDevicesService>();
-            builder.Services.AddHostedService<NewDevicesCleanupWorker>();
+            // Servicio de solicitudes de credenciales desde dispositivos ESP32
+            builder.Services.Configure<DeviceRequestOptions>(builder.Configuration.GetSection("DeviceRequests"));
+            builder.Services.AddSingleton<IDeviceRequestService, DeviceRequestService>();
+            builder.Services.AddHostedService<DeviceRequestCleanupWorker>();
 
             // Servicio de dispositivos conectados
             builder.Services.AddSingleton<IDeviceConnectionService, DeviceConnectionService>();
@@ -78,7 +79,9 @@ namespace WebDispositivosMqtt
                 app.UseHsts();
             }
 
-            app.UseHttpsRedirection();
+            if (!app.Environment.IsDevelopment())
+                app.UseHttpsRedirection();
+
             app.UseRouting();
             app.UseSession();
 

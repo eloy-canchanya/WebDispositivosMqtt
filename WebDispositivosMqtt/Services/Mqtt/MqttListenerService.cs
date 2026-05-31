@@ -2,7 +2,6 @@
 using MQTTnet;
 using MQTTnet.Protocol;
 using WebDispositivosMqtt.Services.Devices;
-using WebDispositivosMqtt.Services.NewDevices;
 using WebDispositivosMqtt.Utils;
 
 namespace WebDispositivosMqtt.Services.Mqtt
@@ -14,18 +13,15 @@ namespace WebDispositivosMqtt.Services.Mqtt
         private readonly MqttOptions _options;
         private readonly ILogger<MqttListenerService> _logger;
         private IMqttClient? _mqttClient;
-        private readonly INewDevicesService _newDeviceService;
         private readonly IDeviceConnectionService _deviceConnectionService;
 
         public MqttListenerService(
             IOptions<MqttOptions> options,
             ILogger<MqttListenerService> logger,
-            INewDevicesService newDeviceService,
             IDeviceConnectionService devConnService)
         {
             _options = options.Value;
             _logger = logger;
-            _newDeviceService = newDeviceService;
             _deviceConnectionService = devConnService;
         }
 
@@ -65,15 +61,7 @@ namespace WebDispositivosMqtt.Services.Mqtt
                     return;
                 }
 
-                if (resource == "register")
-                {
-                    await _newDeviceService.AddOrUpdateAsync(entityId);
-                    return;
-                }
-                else
-                {
-                    await _deviceConnectionService.EvaluateTopicAsync(domain, entityId, resource, acknowledge, payload);
-                }
+                await _deviceConnectionService.EvaluateTopicAsync(domain, entityId, resource, acknowledge, payload);
 
                 _logger.LogInformation("MQTT recibido. Topic: {Topic} Payload: {Payload}", topic, payload);
 
