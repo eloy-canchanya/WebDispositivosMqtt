@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using WebDispositivosMqtt.Data;
 using WebDispositivosMqtt.Services.DeviceRequests;
 using WebDispositivosMqtt.Services.Provisioning;
+using WebDispositivosMqtt.Services.Dynsec;
 using WebDispositivosMqtt.Utils;
 
 namespace WebDispositivosMqtt.Controllers.Api;
@@ -14,22 +15,25 @@ public class ProvisioningController : ControllerBase
     private readonly DatabaseContext _db;
     private readonly IDeviceProvisioningService _provisioning;
     private readonly IDeviceRequestService _deviceRequests;
+    private readonly IDynsecService _dynsec;
 
     public ProvisioningController(
         DatabaseContext db,
         IDeviceProvisioningService provisioning,
-        IDeviceRequestService deviceRequests)
+        IDeviceRequestService deviceRequests,
+        IDynsecService dynsec)
     {
         _db = db;
         _provisioning = provisioning;
         _deviceRequests = deviceRequests;
+        _dynsec = dynsec;
     }
 
     [HttpPost("credential-request")]
     public async Task<IActionResult> CredentialRequest([FromBody] CredentialRequestBody body)
     {
         if (!DeviceMac.IsValid(body.Mac))
-            return BadRequest(new { error = "MAC inválida. Se esperan 12 caracteres hexadecimales en mayúsculas." });
+            return BadRequest(new { error = "MAC inválida. Se esperan 12 caracteres hexadecimales en minúsculas sin separadores (ej: a4b1c2d3e4f5)." });
 
         if (!IsValidKeyword(body.Keyword))
             return BadRequest(new { error = "Palabra clave inválida. Debe contener entre 3 y 6 dígitos o letras." });
@@ -47,7 +51,13 @@ public class ProvisioningController : ControllerBase
         {
             var plainPassword = _provisioning.GetPlainPassword(device.MqttCredential);
 
+            bool confirmed = await _dynsec.EnsureDeviceAsync(device.MacAddress, plainPassword);
+
+            if (!confirmed)
+                return StatusCode(500, new { error = "Error al asegurar el dispositivo en DynSec." });
+
             device.ProvisioningExpiresAt = null;
+            device.IsDelivered = true;
             await _db.SaveChangesAsync();
 
             await _deviceRequests.MarkProvisionedAsync(approvedRequest.Id);
@@ -66,7 +76,10 @@ public class ProvisioningController : ControllerBase
             return StatusCode(403, new { status = "disabled", message = "El dispositivo está deshabilitado. Contacte al administrador." });
 
         // Cualquier otro caso: almacenar/actualizar solicitud y esperar aprobación
-        await _deviceRequests.AddAsync(body.SessionId, body.Mac, body.Keyword, isRegistered: device is not null);
+        await _deviceRequests.AddAsync(body.SessionId, body.Mac, body.Keyword,
+            isRegistered: device is not null,
+            hasPassword: device?.MqttCredential != null,
+            isDelivered: device?.IsDelivered ?? false);
 
         return Accepted(new { status = "pending", message = "Solicitud recibida. Esperando aprobación del administrador." });
     }
@@ -74,7 +87,7 @@ public class ProvisioningController : ControllerBase
     private static bool IsValidKeyword(string? keyword)
         => keyword is not null
             && keyword.Length >= 3
-            && keyword.Length <= 6
+            && keyword.Length <= 10
             && keyword.All(char.IsLetterOrDigit);
 }
 

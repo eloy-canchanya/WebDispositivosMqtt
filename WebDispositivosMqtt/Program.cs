@@ -8,6 +8,7 @@ using WebDispositivosMqtt.Services.Mqtt;
 using WebDispositivosMqtt.Services.Devices;
 using WebDispositivosMqtt.Services.Provisioning;
 using WebDispositivosMqtt.Services.DeviceRequests;
+using WebDispositivosMqtt.Services.Dynsec;
 
 namespace WebDispositivosMqtt
 {
@@ -67,6 +68,9 @@ namespace WebDispositivosMqtt
 
             // Servicio de provisioning MQTT para ESP32
             builder.Services.AddScoped<IDeviceProvisioningService, DeviceProvisioningService>();
+
+            // Servicio de gestión de usuarios dynsec en Mosquitto
+            builder.Services.AddScoped<IDynsecService, DynsecService>();
 
 
             var app = builder.Build();

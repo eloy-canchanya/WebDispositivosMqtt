@@ -3,7 +3,7 @@
 }
 
 <div class="row">
-    <div class="col-md-11">
+    <div class="col-md-12">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h1 class="display-6 mb-0">Solicitudes de credenciales</h1>
             <span id="hubStatus" class="badge bg-warning text-dark">Desconectado</span>
@@ -17,12 +17,13 @@
                     <th>Solicitado</th>
                     <th>Estado</th>
                     <th>Dispositivo</th>
-                    <th style="width:220px">Acciones</th>
+                    <th>Password</th>
+                    <th>Entregado</th>
                 </tr>
             </thead>
             <tbody id="requestsBody">
                 <tr>
-                    <td colspan="6" class="text-center text-muted py-4">No hay solicitudes pendientes</td>
+                    <td colspan="7" class="text-center text-muted py-4">No hay solicitudes pendientes</td>
                 </tr>
             </tbody>
         </table>
@@ -72,7 +73,6 @@
         const modalId         = document.getElementById('modalId');
         const confirmRegisterBtn = document.getElementById('confirmRegister');
 
-        // Clave: id (guid string) — múltiples entradas por MAC permitidas
         const requestsMap = new Map();
 
         function isHistorical(status) {
@@ -95,36 +95,63 @@
             el.addEventListener('hidden.bs.toast', () => el.remove());
         }
 
-        // ---- Badges ----
-        function statusBadge(status) {
-            if (status === 'Pending')     return '<span class="badge bg-warning text-dark">Pendiente</span>';
-            if (status === 'Approved')    return '<span class="badge bg-success">Aprobado</span>';
-            if (status === 'Cancelled')   return '<span class="badge bg-danger">Cancelado</span>';
-            if (status === 'Provisioned') return '<span class="badge bg-primary">Provisionado</span>';
-            return `<span class="badge bg-secondary">${status}</span>`;
+        // ---- Columna Estado ----
+        function statusCell(r) {
+            let badge;
+            if (r.status === 'Pending')       badge = '<span class="badge bg-warning text-dark">Pendiente</span>';
+            else if (r.status === 'Approved')  badge = '<span class="badge bg-success">Aprobado</span>';
+            else if (r.status === 'Cancelled') badge = '<span class="badge bg-danger">Cancelado</span>';
+            else if (r.status === 'Provisioned') badge = '<span class="badge bg-primary">Entregado</span>';
+            else badge = `<span class="badge bg-secondary">${r.status}</span>`;
+
+            const canCancel = r.status === 'Pending' || r.status === 'Approved';
+            const cancelBtn = canCancel
+                ? `<br><button class="btn btn-sm btn-outline-danger mt-1" onclick="cancelRequest('${r.id}')">Cancelar</button>`
+                : '';
+
+            return badge + cancelBtn;
         }
 
-        function deviceBadge(r) {
-            if (!r.isRegistered) return '<span class="badge bg-secondary">Nuevo</span>';
-            return `<span class="badge bg-info text-dark" title="${r.deviceName ?? ''}">${r.deviceName ?? 'Registrado'}</span>`;
+        // ---- Columna Dispositivo ----
+        function deviceCell(r) {
+            const badge = r.isRegistered
+                ? `<span class="badge bg-info text-dark" title="${r.deviceName ?? ''}">${r.deviceName ?? 'Registrado'}</span>`
+                : '<span class="badge bg-secondary">Nuevo</span>';
+
+            const registerBtn = (!r.isRegistered && r.status === 'Pending')
+                ? `<br><button class="btn btn-sm btn-primary mt-1" onclick="openRegisterModal('${r.id}', '${r.macAddress}')">Registrar</button>`
+                : '';
+
+            return badge + registerBtn;
         }
 
-        function actionButtons(r) {
-            // Filas históricas: solo lectura, sin botones
-            if (isHistorical(r.status)) return '';
+        // ---- Columna Password ----
+        function passwordCell(r) {
+            const badge = r.hasPassword
+                ? '<span class="badge bg-success">ok</span>'
+                : '<span class="badge bg-secondary">---</span>';
 
-            const cancelBtn = `<button class="btn btn-sm btn-outline-danger" onclick="cancelRequest('${r.id}')">Cancelar</button>`;
+            const canSet = r.isRegistered && r.status === 'Pending';
+            const label = r.hasPassword ? 'Recrear' : 'Crear';
+            const btn = canSet
+                ? `<br><button class="btn btn-sm btn-outline-primary mt-1" onclick="setPassword('${r.id}', ${r.hasPassword})">${label}</button>`
+                : '';
 
-            if (r.status === 'Approved')
-                return `<span class="text-muted small me-2">Esperando dispositivo...</span>${cancelBtn}`;
+            return badge + btn;
+        }
 
-            let html = '';
-            if (!r.isRegistered) {
-                html += `<button class="btn btn-sm btn-primary me-1" onclick="openRegisterModal('${r.id}', '${r.macAddress}')">Registrar</button>`;
-            } else {
-                html += `<button class="btn btn-sm btn-success me-1" onclick="approveRequest('${r.id}')">Aprobar</button>`;
-            }
-            return html + cancelBtn;
+        // ---- Columna Entregado ----
+        function deliveredCell(r) {
+            const badge = r.isDelivered
+                ? '<span class="badge bg-success">Sí</span>'
+                : '<span class="badge bg-secondary">No</span>';
+
+            const canOpen = r.isRegistered && r.hasPassword && r.status === 'Pending';
+            const btn = canOpen
+                ? `<br><button class="btn btn-sm btn-outline-success mt-1" onclick="openWindow('${r.id}')">Abrir ventana</button>`
+                : '';
+
+            return badge + btn;
         }
 
         // ---- Render ----
@@ -133,7 +160,7 @@
                 .sort((a, b) => new Date(b.createdAtUtc) - new Date(a.createdAtUtc));
 
             if (items.length === 0) {
-                requestsBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No hay solicitudes pendientes</td></tr>';
+                requestsBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No hay solicitudes pendientes</td></tr>';
                 return;
             }
 
@@ -146,9 +173,10 @@
                     <td><code>${r.macAddress}</code></td>
                     <td><strong>${r.keyword}</strong></td>
                     <td data-utc-datetime="${r.createdAtUtc}">${window.appFormatUtcDateTime(r.createdAtUtc)}</td>
-                    <td>${statusBadge(r.status)}</td>
-                    <td>${deviceBadge(r)}</td>
-                    <td>${actionButtons(r)}</td>
+                    <td>${statusCell(r)}</td>
+                    <td>${deviceCell(r)}</td>
+                    <td>${passwordCell(r)}</td>
+                    <td>${deliveredCell(r)}</td>
                 `;
                 requestsBody.appendChild(tr);
             }
@@ -192,15 +220,15 @@
                 if (res.ok) {
                     const r = requestsMap.get(id);
                     if (r) {
-                        r.status               = 'Approved';
-                        r.isRegistered         = true;
-                        r.deviceName           = data.deviceName;
-                        r.deviceId             = data.deviceId;
-                        r.provisioningExpiresAt = data.provisioningExpiresAt;
+                        r.isRegistered = true;
+                        r.deviceName   = data.deviceName;
+                        r.deviceId     = data.deviceId;
+                        r.hasPassword  = false;
+                        r.isDelivered  = false;
                     }
                     renderRequests();
                     registerModal.hide();
-                    showToast(`Dispositivo "${data.deviceName}" registrado. Ventana abierta 10 min.`);
+                    showToast(`Dispositivo "${data.deviceName}" registrado. Ahora cree el password.`);
                 } else {
                     showToast(data.error ?? 'Error al registrar.', 'danger');
                 }
@@ -211,18 +239,45 @@
             }
         });
 
-        // ---- Aprobar (dispositivo ya registrado) ----
-        async function approveRequest(id) {
+        // ---- Crear / Recrear password ----
+        async function setPassword(id, hasPassword) {
+            const r = requestsMap.get(id);
+            if (!r) return;
+
+            const accion = hasPassword ? 'recrear' : 'crear';
+            if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} password para ${r.macAddress}?`)) return;
+
             try {
-                const res  = await fetch(`/api/device-requests/${id}/approve`, { method: 'POST' });
+                const res  = await fetch(`/api/device-requests/${id}/set-password`, { method: 'POST' });
+                const data = await res.json();
+                if (res.ok) {
+                    r.hasPassword = true;
+                    r.isDelivered = false;
+                    renderRequests();
+                    showToast(`Password ${accion === 'crear' ? 'creado' : 'actualizado'} para ${r.macAddress}.`);
+                } else {
+                    showToast(data.error ?? 'Error al crear password.', 'danger');
+                }
+            } catch {
+                showToast('Error de red.', 'danger');
+            }
+        }
+
+        // ---- Abrir ventana de tiempo ----
+        async function openWindow(id) {
+            try {
+                const res  = await fetch(`/api/device-requests/${id}/open-window`, { method: 'POST' });
                 const data = await res.json();
                 if (res.ok) {
                     const r = requestsMap.get(id);
-                    if (r) { r.status = 'Approved'; r.provisioningExpiresAt = data.provisioningExpiresAt; }
+                    if (r) {
+                        r.status = 'Approved';
+                        r.provisioningExpiresAt = data.provisioningExpiresAt;
+                    }
                     renderRequests();
-                    showToast(`Ventana abierta para "${data.deviceName}". 10 min para conectarse.`);
+                    showToast('Ventana abierta. El dispositivo tiene 10 min para conectarse.');
                 } else {
-                    showToast(data.error ?? 'Error al aprobar.', 'danger');
+                    showToast(data.error ?? 'Error al abrir ventana.', 'danger');
                 }
             } catch {
                 showToast('Error de red.', 'danger');
@@ -259,7 +314,9 @@
                 isRegistered:          payload.isRegistered,
                 deviceId:              null,
                 deviceName:            null,
-                provisioningExpiresAt: null
+                provisioningExpiresAt: null,
+                hasPassword:           payload.hasPassword ?? false,
+                isDelivered:           payload.isDelivered ?? false
             });
             renderRequests();
             showToast(`Nueva solicitud de ${payload.macAddress} — clave: <strong>${payload.keyword}</strong>`);
@@ -272,7 +329,7 @@
 
         connection.on('SolicitudProvisionada', (payload) => {
             const r = requestsMap.get(payload.id);
-            if (r) { r.status = 'Provisioned'; renderRequests(); }
+            if (r) { r.status = 'Provisioned'; r.isDelivered = true; renderRequests(); }
         });
 
         connection.on('SolicitudExpirada', (payload) => {

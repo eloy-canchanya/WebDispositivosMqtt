@@ -39,15 +39,16 @@
             <th>Habilitado</th>
             <th>Registrado por</th>
             <th>Fecha registro</th>
-            <th>Provisionamiento</th>
-            <th style="width:180px;">Acciones</th>
+            <th>Password</th>
+            <th>DynSec</th>
+            <th>Entregado</th>
         </tr>
     </thead>
     <tbody>
         @if (!Model.Any())
         {
             <tr>
-                <td colspan="7" class="text-center text-muted">No hay dispositivos registrados.</td>
+                <td colspan="8" class="text-center text-muted">No hay dispositivos registrados.</td>
             </tr>
         }
         else
@@ -61,33 +62,56 @@
                     <td>@d.RegisteredByUserName</td>
                     <td data-utc-datetime="@(AsUtcIso(d.RegisteredAtUtc) ?? "")"></td>
                     <td>
-                        @if (d.ProvisioningExpiresAt is null)
+                        @if (d.HasPassword)
                         {
-                            <span class="badge bg-success">Provisionado</span>
-                        }
-                        else if (d.ProvisioningExpiresAt > DateTime.UtcNow)
-                        {
-                            <span class="badge bg-warning text-dark"
-                                  data-countdown="@AsUtcIso(d.ProvisioningExpiresAt)">
-                                Calculando...
-                            </span>
+                            <span class="badge bg-success">ok</span>
                         }
                         else
                         {
-                            <span class="badge bg-danger">Ventana expirada</span>
+                            <span class="badge bg-secondary">---</span>
                         }
-                    </td>
-                    <td>
                         <form method="post"
                               asp-controller="Devices"
-                              asp-action="ResetProvisioning"
-                              onsubmit="return confirm('¿Regenerar credenciales de @d.Name? La contraseña actual quedará inválida.')">
+                              asp-action="SetPassword"
+                              class="d-inline ms-1"
+                              onsubmit="return confirm('@(d.HasPassword ? $"¿Recrear password para {d.Name}? La contraseña actual quedará inválida." : $"¿Crear password para {d.Name}?")')">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="deviceId" value="@d.DeviceId" />
-                            <button type="submit" class="btn btn-sm btn-warning">
-                                Regenerar credenciales
+                            <button type="submit" class="btn btn-sm @(d.HasPassword ? "btn-outline-warning" : "btn-outline-primary")">
+                                @(d.HasPassword ? "Recrear" : "Crear")
                             </button>
                         </form>
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary dynsec-badge" data-mac="@d.MacAddress">—</span>
+                        <button class="btn btn-sm btn-outline-secondary btn-verify-dynsec ms-1"
+                                data-mac="@d.MacAddress" title="Verificar DynSec">
+                            <small>Verificar</small>
+                        </button>
+                    </td>
+                    <td>
+                        @if (d.IsDelivered)
+                        {
+                            <span class="badge bg-success">Sí</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">No</span>
+                        }
+                        @if (d.HasPassword)
+                        {
+                            <form method="post"
+                                  asp-controller="Devices"
+                                  asp-action="OpenWindow"
+                                  class="d-inline ms-1"
+                                  onsubmit="return confirm('¿Abrir ventana de provisioning para @d.Name?')">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="deviceId" value="@d.DeviceId" />
+                                <button type="submit" class="btn btn-sm btn-outline-success">
+                                    Abrir ventana
+                                </button>
+                            </form>
+                        }
                     </td>
                 </tr>
             }
@@ -97,24 +121,53 @@
 
 @section Scripts {
     <script>
-        // Countdown en tiempo real para ventanas abiertas
-        function updateCountdowns() {
-            document.querySelectorAll("[data-countdown]").forEach(el => {
-                const exp = new Date(el.dataset.countdown);
-                const secs = Math.floor((exp - new Date()) / 1000);
-                if (secs <= 0) {
-                    el.className = "badge bg-danger";
-                    el.textContent = "Ventana expirada";
-                    el.removeAttribute("data-countdown");
-                } else {
-                    const m = Math.floor(secs / 60).toString().padStart(2, "0");
-                    const s = (secs % 60).toString().padStart(2, "0");
-                    el.textContent = `⏳ Ventana abierta ${m}:${s}`;
-                }
-            });
+        // Verificación DynSec por dispositivo
+        async function applyDynsecStatus(badge, data) {
+            switch (data.status) {
+                case "Enabled":
+                    badge.className = "badge bg-success dynsec-badge";
+                    badge.textContent = "Habilitado";
+                    badge.title = data.roles?.join(", ") ?? "";
+                    break;
+                case "Disabled":
+                    badge.className = "badge bg-warning text-dark dynsec-badge";
+                    badge.textContent = "Deshabilitado";
+                    badge.title = data.roles?.join(", ") ?? "";
+                    break;
+                case "NotFound":
+                    badge.className = "badge bg-danger dynsec-badge";
+                    badge.textContent = "No existe";
+                    badge.title = "";
+                    break;
+                default:
+                    badge.className = "badge bg-warning text-dark dynsec-badge";
+                    badge.textContent = "Error";
+                    badge.title = data.error ?? "";
+            }
         }
 
-        updateCountdowns();
-        setInterval(updateCountdowns, 1000);
+        document.querySelectorAll(".btn-verify-dynsec").forEach(btn => {
+            btn.addEventListener("click", async function () {
+                const mac = this.dataset.mac;
+                const badge = document.querySelector(`.dynsec-badge[data-mac="${CSS.escape(mac)}"]`);
+
+                this.disabled = true;
+                badge.className = "badge bg-secondary dynsec-badge";
+                badge.textContent = "⏳";
+                badge.title = "";
+
+                try {
+                    const res = await fetch(`/Devices/DynsecStatus?mac=${encodeURIComponent(mac)}`);
+                    const data = await res.json();
+                    await applyDynsecStatus(badge, data);
+                } catch {
+                    badge.className = "badge bg-danger dynsec-badge";
+                    badge.textContent = "Error";
+                    badge.title = "";
+                }
+
+                this.disabled = false;
+            });
+        });
     </script>
 }

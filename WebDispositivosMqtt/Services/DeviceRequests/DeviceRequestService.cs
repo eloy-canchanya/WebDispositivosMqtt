@@ -31,7 +31,7 @@ namespace WebDispositivosMqtt.Services.DeviceRequests
 
     public interface IDeviceRequestService
     {
-        Task AddAsync(Guid sessionId, string macAddress, string keyword, bool isRegistered);
+        Task AddAsync(Guid sessionId, string macAddress, string keyword, bool isRegistered, bool hasPassword, bool isDelivered);
         IReadOnlyCollection<DeviceRequest> GetAll();
         bool TryGet(Guid id, out DeviceRequest request);
         bool TryGetApproved(Guid sessionId, out DeviceRequest request);
@@ -51,7 +51,7 @@ namespace WebDispositivosMqtt.Services.DeviceRequests
             _hubContext = hubContext;
         }
 
-        public async Task AddAsync(Guid sessionId, string macAddress, string keyword, bool isRegistered)
+        public async Task AddAsync(Guid sessionId, string macAddress, string keyword, bool isRegistered, bool hasPassword, bool isDelivered)
         {
             // Mismo GUID: mismo dispositivo reintentando → refrescar TTL silenciosamente
             if (_requests.TryGetValue(sessionId, out var existing))
@@ -80,7 +80,9 @@ namespace WebDispositivosMqtt.Services.DeviceRequests
                 keyword = request.Keyword,
                 createdAtUtc = request.CreatedAtUtc,
                 status = request.Status.ToString(),
-                isRegistered
+                isRegistered,
+                hasPassword,
+                isDelivered
             });
         }
 

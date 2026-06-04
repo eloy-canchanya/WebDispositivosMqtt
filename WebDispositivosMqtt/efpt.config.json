@@ -5,7 +5,7 @@
    "FilterSchemas": false,
    "IncludeConnectionString": false,
    "IrregularWords": null,
-   "MinimumProductVersion": "2.6.1465",
+   "MinimumProductVersion": "2.6.1604",
    "ModelNamespace": null,
    "OutputContextPath": "Data",
    "OutputPath": "Data\/Models",
