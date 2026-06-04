@@ -14,6 +14,7 @@ namespace WebDispositivosMqtt.Services.Mqtt
         private readonly ILogger<MqttListenerService> _logger;
         private IMqttClient? _mqttClient;
         private readonly IDeviceConnectionService _deviceConnectionService;
+        private int _reconnecting = 0;
 
         public MqttListenerService(
             IOptions<MqttOptions> options,
@@ -90,18 +91,32 @@ namespace WebDispositivosMqtt.Services.Mqtt
             {
                 _logger.LogWarning("Desconectado del broker MQTT");
 
-                while (!stoppingToken.IsCancellationRequested)
+                if (Interlocked.CompareExchange(ref _reconnecting, 1, 0) != 0)
+                    return;
+
+                try
                 {
-                    try
+                    while (!stoppingToken.IsCancellationRequested)
                     {
-                        await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
-                        await _mqttClient.ConnectAsync(BuildOptions(), stoppingToken);
-                        return;
+                        try
+                        {
+                            await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                            await _mqttClient.ConnectAsync(BuildOptions(), stoppingToken);
+                            return;
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            return;
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Reintento de conexión MQTT fallido");
+                        }
                     }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Reintento de conexión MQTT fallido");
-                    }
+                }
+                finally
+                {
+                    Interlocked.Exchange(ref _reconnecting, 0);
                 }
             };
 
@@ -133,18 +148,12 @@ namespace WebDispositivosMqtt.Services.Mqtt
         private MqttClientOptions BuildOptions()
         {
             var builder = new MqttClientOptionsBuilder()
-                .WithClientId(_options.ClientId)
-                .WithTcpServer(_options.Host, _options.Port);
-
-            if (!string.IsNullOrWhiteSpace(_options.Username))
-            {
-                builder = builder.WithCredentials(_options.Username, _options.Password);
-            }
+                .WithClientId(_options.Listener.ClientId)
+                .WithTcpServer(_options.Host, _options.Port)
+                .WithCredentials(_options.Listener.Username, _options.Listener.Password);
 
             if (_options.UseTls)
-            {
                 builder = builder.WithTlsOptions(_ => { });
-            }
 
             return builder.Build();
         }

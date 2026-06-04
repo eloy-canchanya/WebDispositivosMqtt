@@ -23,6 +23,8 @@ public partial class Device
 
     public DateTime? ProvisioningExpiresAt { get; set; }
 
+    public bool IsDelivered { get; set; }
+
     public virtual AspNetUser RegisteredByUser { get; set; }
 
     public virtual ICollection<UserDevice> UserDevices { get; set; } = new List<UserDevice>();

@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using WebDispositivosMqtt.Data;
 using WebDispositivosMqtt.DataIdentity.Models;
 using WebDispositivosMqtt.Services.Devices;
+using WebDispositivosMqtt.Services.Dynsec;
 using WebDispositivosMqtt.Services.Provisioning;
 
 namespace WebDispositivosMqtt.Controllers
@@ -16,7 +17,9 @@ namespace WebDispositivosMqtt.Controllers
         bool IsEnabled,
         DateTime RegisteredAtUtc,
         string RegisteredByUserName,
-        DateTime? ProvisioningExpiresAt);
+        DateTime? ProvisioningExpiresAt,
+        bool HasPassword,
+        bool IsDelivered);
 
     public record DeviceConnectionViewModel
     {
@@ -36,7 +39,10 @@ namespace WebDispositivosMqtt.Controllers
     public class DevicesController(
         DatabaseContext db,
         UserManager<ApplicationUser> userManager,
-        IDeviceProvisioningService provisioning) : Controller
+        IDeviceProvisioningService provisioning,
+        IDeviceConnectionService deviceConnectionService,
+        IDynsecService dynsec,
+        ILogger<DevicesController> logger) : Controller
     {
         private sealed record DeviceRow(
             Guid DeviceId,
@@ -81,14 +87,24 @@ namespace WebDispositivosMqtt.Controllers
                     .ToListAsync();
             }
 
-            var viewModels = dbRows.Select(d => new DeviceConnectionViewModel
+            var connectionStates = deviceConnectionService.GetAll()
+                .ToDictionary(s => s.MacAddress);
+
+            var viewModels = dbRows.Select(d =>
             {
-                DeviceId = d.DeviceId.ToString(),
-                MacAddress = d.MacAddress,
-                Name = d.Name,
-                IsEnabled = d.IsEnabled,
-                RegisteredByUserName = d.RegisteredByUserName ?? string.Empty,
-                RegisteredAtUtc = d.RegisteredAtUtc
+                connectionStates.TryGetValue(d.MacAddress, out var state);
+                return new DeviceConnectionViewModel
+                {
+                    DeviceId = d.DeviceId.ToString(),
+                    MacAddress = d.MacAddress,
+                    Name = d.Name,
+                    IsEnabled = d.IsEnabled,
+                    RegisteredByUserName = d.RegisteredByUserName ?? string.Empty,
+                    RegisteredAtUtc = d.RegisteredAtUtc,
+                    IsOnline = state?.IsOnline ?? false,
+                    LastSeenUtc = state?.LastSeenUtc ?? default,
+                    LastSeenType = state?.LastSeenType
+                };
             }).ToList();
 
             return View(viewModels);
@@ -106,31 +122,86 @@ namespace WebDispositivosMqtt.Controllers
                     d.IsEnabled,
                     d.RegisteredAtUtc,
                     d.RegisteredByUser!.UserName ?? "",
-                    d.ProvisioningExpiresAt))
+                    d.ProvisioningExpiresAt,
+                    d.MqttCredential != null,
+                    d.IsDelivered))
                 .ToListAsync();
 
             return View(devices);
         }
 
+        [HttpGet]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> DynsecStatus([FromQuery] string mac)
+        {
+            try
+            {
+                var info = await dynsec.GetClientStatusAsync(mac);
+                return Json(new { status = info.Status.ToString(), roles = info.Roles, error = info.ErrorMessage });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { status = "Error", roles = Array.Empty<string>(), error = ex.Message });
+            }
+        }
+
         [HttpPost]
         [Authorize(Roles = "Admin")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ResetProvisioning(Guid deviceId)
+        public async Task<IActionResult> SetPassword(Guid deviceId)
         {
             var device = await db.Devices.FindAsync(deviceId);
 
             if (device is null || !device.IsEnabled)
             {
-                TempData["Error"] = "Dispositivo no encontrado.";
+                TempData["Error"] = "Dispositivo no encontrado o deshabilitado.";
                 return RedirectToAction(nameof(Admin));
             }
 
-            device.MqttCredential = provisioning.GenerateCredential(out _);
-            device.ProvisioningExpiresAt = DateTime.UtcNow.AddMinutes(10);
+            var encrypted = provisioning.GenerateCredential(out var plainPassword);
 
+            try
+            {
+                await dynsec.SetDevicePasswordAsync(device.MacAddress, plainPassword);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error al guardar password en dynsec para {Mac}", device.MacAddress);
+                TempData["Error"] = $"Error al guardar credenciales en Mosquitto para {device.Name}.";
+                return RedirectToAction(nameof(Admin));
+            }
+
+            device.MqttCredential = encrypted;
+            device.IsDelivered = false;
             await db.SaveChangesAsync();
 
-            TempData["Ok"] = $"Credenciales regeneradas para {device.Name}. El dispositivo tiene 10 minutos para provisionarse.";
+            TempData["Ok"] = $"Password actualizado para {device.Name}.";
+            return RedirectToAction(nameof(Admin));
+        }
+
+        [HttpPost]
+        [Authorize(Roles = "Admin")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> OpenWindow(Guid deviceId)
+        {
+            var device = await db.Devices.FindAsync(deviceId);
+
+            if (device is null || !device.IsEnabled)
+            {
+                TempData["Error"] = "Dispositivo no encontrado o deshabilitado.";
+                return RedirectToAction(nameof(Admin));
+            }
+
+            if (device.MqttCredential is null)
+            {
+                TempData["Error"] = $"El dispositivo {device.Name} no tiene password. Créelo primero.";
+                return RedirectToAction(nameof(Admin));
+            }
+
+            device.ProvisioningExpiresAt = DateTime.UtcNow.AddMinutes(10);
+            await db.SaveChangesAsync();
+
+            TempData["Ok"] = $"Ventana abierta para {device.Name}. El dispositivo tiene 10 minutos para provisionarse.";
             return RedirectToAction(nameof(Admin));
         }
     }

@@ -2,9 +2,7 @@ namespace WebDispositivosMqtt.Utils;
 
 public static class DeviceMac
 {
-    /// <summary>
-    /// Validates that a MAC is exactly 12 uppercase hex characters with no separators.
-    /// </summary>
+    // 12 lowercase hex chars, no separators: e.g. a4b1c2d3e4f5
     public static bool IsValid(string? mac) =>
-        mac is { Length: 12 } && mac.All(char.IsAsciiHexDigitUpper);
+        mac is { Length: 12 } && mac.All(char.IsAsciiHexDigitLower);
 }
