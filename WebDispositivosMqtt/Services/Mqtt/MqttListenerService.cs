@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Options;
 using MQTTnet;
 using MQTTnet.Protocol;
+using WebDispositivosMqtt.Services.Commands;
 using WebDispositivosMqtt.Services.Devices;
 using WebDispositivosMqtt.Utils;
 
@@ -14,16 +15,19 @@ namespace WebDispositivosMqtt.Services.Mqtt
         private readonly ILogger<MqttListenerService> _logger;
         private IMqttClient? _mqttClient;
         private readonly IDeviceConnectionService _deviceConnectionService;
+        private readonly ICommandAckService _commandAckService;
         private int _reconnecting = 0;
 
         public MqttListenerService(
             IOptions<MqttOptions> options,
             ILogger<MqttListenerService> logger,
-            IDeviceConnectionService devConnService)
+            IDeviceConnectionService devConnService,
+            ICommandAckService commandAckService)
         {
             _options = options.Value;
             _logger = logger;
             _deviceConnectionService = devConnService;
+            _commandAckService = commandAckService;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -62,7 +66,14 @@ namespace WebDispositivosMqtt.Services.Mqtt
                     return;
                 }
 
-                await _deviceConnectionService.EvaluateTopicAsync(domain, entityId, resource, acknowledge, payload);
+                if (resource == "commands" && acknowledge == "ack")
+                {
+                    await _commandAckService.AcknowledgeAsync(entityId, payload);
+                }
+                else
+                {
+                    await _deviceConnectionService.EvaluateTopicAsync(domain, entityId, resource, acknowledge, payload);
+                }
 
                 _logger.LogInformation("MQTT recibido. Topic: {Topic} Payload: {Payload}", topic, payload);
 
