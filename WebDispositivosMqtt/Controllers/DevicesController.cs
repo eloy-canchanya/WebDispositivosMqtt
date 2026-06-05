@@ -4,8 +4,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebDispositivosMqtt.Data;
 using WebDispositivosMqtt.DataIdentity.Models;
+using Microsoft.Extensions.Options;
+using WebDispositivosMqtt.Services.Commands;
 using WebDispositivosMqtt.Services.Devices;
 using WebDispositivosMqtt.Services.Dynsec;
+using WebDispositivosMqtt.Services.Mqtt;
 using WebDispositivosMqtt.Services.Provisioning;
 
 namespace WebDispositivosMqtt.Controllers
@@ -42,6 +45,9 @@ namespace WebDispositivosMqtt.Controllers
         IDeviceProvisioningService provisioning,
         IDeviceConnectionService deviceConnectionService,
         IDynsecService dynsec,
+        ICommandAckService commandAckService,
+        IMqttPublisherService publisher,
+        IOptions<TerminalOptions> terminalOptions,
         ILogger<DevicesController> logger) : Controller
     {
         private sealed record DeviceRow(
@@ -107,6 +113,7 @@ namespace WebDispositivosMqtt.Controllers
                 };
             }).ToList();
 
+            ViewData["CommandTimeoutSeconds"] = terminalOptions.Value.CommandTimeoutSeconds;
             return View(viewModels);
         }
 
@@ -203,6 +210,36 @@ namespace WebDispositivosMqtt.Controllers
 
             TempData["Ok"] = $"Ventana abierta para {device.Name}. El dispositivo tiene 10 minutos para provisionarse.";
             return RedirectToAction(nameof(Admin));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SendCommand([FromForm] Guid deviceId, [FromForm] string cmd)
+        {
+            var userId  = userManager.GetUserId(User);
+            var isAdmin = User.IsInRole("Admin");
+
+            var device = isAdmin
+                ? await db.Devices.FindAsync(deviceId)
+                : await db.Devices.FirstOrDefaultAsync(d =>
+                    d.DeviceId == deviceId &&
+                    d.UserDevices.Any(ud => ud.UserId == userId));
+
+            if (device is null || !device.IsEnabled)
+                return Json(new { ok = false, error = "Dispositivo no encontrado o deshabilitado." });
+
+            var commandId = commandAckService.RegisterCommand(device.MacAddress, cmd);
+
+            try
+            {
+                await publisher.PublishCommandAsync(device.MacAddress, commandId, cmd);
+                return Json(new { ok = true, commandId });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error publicando comando '{Cmd}' al dispositivo {Mac}", cmd, device.MacAddress);
+                return Json(new { ok = false, error = "Error al publicar el comando." });
+            }
         }
     }
 }

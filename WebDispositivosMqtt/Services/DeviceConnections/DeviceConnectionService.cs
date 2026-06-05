@@ -44,14 +44,24 @@ namespace WebDispositivosMqtt.Services.Devices
 
                 AddOrUpdate(entityId, isOnline, now, LastSeenType.Status);
 
-                var shouldNotifyStatusChanged =
+                var shouldNotify =
                     (!hadPreviousState && isOnline) ||
                     (hadPreviousState && previousIsOnline != isOnline);
 
-                if (shouldNotifyStatusChanged)
-                {
+                if (shouldNotify)
                     await DeviceConnectionsHub.NotifyStatusChangedAsync(hub, entityId, isOnline, now, LastSeenType.Status);
-                }
+            }
+            else if (resource == "heartbeat")
+            {
+                var now = DateTime.UtcNow;
+                TryGet(entityId, out var existing);
+                var wasOnline = existing?.IsOnline ?? false;
+
+                AddOrUpdate(entityId, true, now, LastSeenType.Heartbeat);
+
+                // Siempre notificar: actualiza "última actividad" en la UI
+                // Si estaba offline, además cambia el badge a conectado
+                await DeviceConnectionsHub.NotifyStatusChangedAsync(hub, entityId, true, now, LastSeenType.Heartbeat);
             }
         }
 

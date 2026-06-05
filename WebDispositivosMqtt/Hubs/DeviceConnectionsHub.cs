@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using WebDispositivosMqtt.Data;
+using WebDispositivosMqtt.Services.Commands;
 using WebDispositivosMqtt.Services.Devices;
 
 namespace WebDispositivosMqtt.Hubs
@@ -54,5 +55,16 @@ namespace WebDispositivosMqtt.Hubs
 
         public static Task NotifyDeviceExpiredAsync(IHubContext<DeviceConnectionsHub> hub, string macAddress)
             => hub.Clients.Groups([macAddress, AdminGroup]).SendAsync("DispositivoExpirado", new { macAddress });
+
+        public static Task NotifyCommandAckedAsync(IHubContext<DeviceConnectionsHub> hub, CommandRecord record)
+            => hub.Clients.Groups([record.Mac, AdminGroup]).SendAsync("ComandoAcknowledged", new
+            {
+                record.CommandId,
+                record.Mac,
+                record.Cmd,
+                record.AckStatus,
+                record.AckedAtUtc,
+                record.Response
+            });
     }
 }

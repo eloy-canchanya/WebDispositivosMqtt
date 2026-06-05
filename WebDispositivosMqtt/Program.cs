@@ -9,6 +9,7 @@ using WebDispositivosMqtt.Services.Devices;
 using WebDispositivosMqtt.Services.Provisioning;
 using WebDispositivosMqtt.Services.DeviceRequests;
 using WebDispositivosMqtt.Services.Dynsec;
+using WebDispositivosMqtt.Services.Commands;
 
 namespace WebDispositivosMqtt
 {
@@ -56,6 +57,15 @@ namespace WebDispositivosMqtt
             // Servicio mqtt
             builder.Services.Configure<MqttOptions>(builder.Configuration.GetSection("Mqtt"));
             builder.Services.AddHostedService<MqttListenerService>();
+            builder.Services.AddSingleton<MqttPublisherService>();
+            builder.Services.AddSingleton<IMqttPublisherService>(sp => sp.GetRequiredService<MqttPublisherService>());
+            builder.Services.AddHostedService(sp => sp.GetRequiredService<MqttPublisherService>());
+
+            // Tracking de comandos y acks
+            builder.Services.AddSingleton<ICommandAckService, CommandAckService>();
+
+            // Opciones de la terminal web
+            builder.Services.Configure<TerminalOptions>(builder.Configuration.GetSection("Terminal"));
 
             // Servicio de solicitudes de credenciales desde dispositivos ESP32
             builder.Services.Configure<DeviceRequestOptions>(builder.Configuration.GetSection("DeviceRequests"));
