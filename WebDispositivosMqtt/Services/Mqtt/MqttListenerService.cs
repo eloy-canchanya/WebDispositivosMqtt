@@ -159,8 +159,9 @@ namespace WebDispositivosMqtt.Services.Mqtt
         private MqttClientOptions BuildOptions()
         {
             var builder = new MqttClientOptionsBuilder()
-                .WithClientId(_options.Listener.ClientId)
                 .WithTcpServer(_options.Host, _options.Port)
+                .WithKeepAlivePeriod(TimeSpan.FromSeconds(_options.KeepAliveSeconds))
+                .WithClientId(_options.Listener.ClientId)
                 .WithCredentials(_options.Listener.Username, _options.Listener.Password);
 
             if (_options.UseTls)

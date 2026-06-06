@@ -73,9 +73,10 @@ namespace WebDispositivosMqtt.Services.Mqtt
         private Task ConnectAsync(CancellationToken ct)
         {
             var builder = new MqttClientOptionsBuilder()
-                .WithClientId(_options.Listener.ClientId + "-pub")
                 .WithTcpServer(_options.Host, _options.Port)
-                .WithCredentials(_options.Listener.Username, _options.Listener.Password);
+                .WithKeepAlivePeriod(TimeSpan.FromSeconds(_options.KeepAliveSeconds))
+                .WithClientId(_options.Publisher.ClientId)
+                .WithCredentials(_options.Publisher.Username, _options.Publisher.Password);
 
             if (_options.UseTls)
                 builder = builder.WithTlsOptions(_ => { });
