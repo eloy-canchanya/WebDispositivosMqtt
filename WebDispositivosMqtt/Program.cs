@@ -94,7 +94,12 @@ namespace WebDispositivosMqtt
             }
 
             if (!app.Environment.IsDevelopment())
-                app.UseHttpsRedirection();
+            {
+                app.UseWhen(
+                    ctx => !ctx.Request.Path.StartsWithSegments("/api/devices"),
+                    appBuilder => appBuilder.UseHttpsRedirection()
+                );
+            }
 
             app.UseRouting();
             app.UseSession();
@@ -132,8 +137,8 @@ namespace WebDispositivosMqtt
             var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
 
             const string adminRole = "Admin";
-            const string email = "user@email.test";
-            const string password = "password";
+            const string email = "admin@coyllor.net";
+            const string password = "Admin123";
 
             if (!await roleManager.RoleExistsAsync(adminRole))
             {
