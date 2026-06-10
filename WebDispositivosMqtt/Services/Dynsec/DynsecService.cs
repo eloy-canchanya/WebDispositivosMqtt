@@ -69,13 +69,20 @@ public class DynsecService : IDynsecService
         {
             bool alreadyExists = await PublishAndQueryAsync(createPayload, ParseCreateOrExistsResponse);
 
+            // createClient no actualiza contraseña ni roles si el cliente ya existe; se requiere modifyClient para aplicar los cambios.
             if (alreadyExists)
             {
                 var modifyPayload = new
                 {
                     commands = new object[]
                     {
-                        new { command = "modifyClient", username = macAddress, password = plainPassword }
+                        new
+                        {
+                            command = "modifyClient",
+                            username = macAddress,
+                            password = plainPassword,
+                            roles = new[] { new { rolename = "role-device", priority = -1 } }
+                        }
                     }
                 };
                 await PublishAndQueryAsync(modifyPayload, ParseConfirmResponse);
