@@ -28,23 +28,24 @@
     <span id="hubBannerMsg"></span>
 </div>
 
+<div class="table-responsive">
 <table class="table table-striped align-middle">
     <thead>
         <tr>
             <th>Nombre</th>
             @if (isAdmin)
             {
-                <th>MAC</th>
+                <th class="d-none d-lg-table-cell">MAC</th>
             }
             <th>Estado</th>
-            <th>Última actividad</th>
+            <th class="d-none d-sm-table-cell">Última actividad</th>
             <th>Terminal</th>
             @if (isAdmin)
             {
-                <th>Tipo señal</th>
-                <th>Habilitado</th>
-                <th>Registrado por</th>
-                <th>Fecha registro</th>
+                <th class="d-none d-xl-table-cell">Tipo señal</th>
+                <th class="d-none d-xl-table-cell">Habilitado</th>
+                <th class="d-none d-xl-table-cell">Registrado por</th>
+                <th class="d-none d-xl-table-cell">Fecha registro</th>
             }
         </tr>
     </thead>
@@ -65,20 +66,20 @@
 
                     @if (isAdmin)
                     {
-                        <td>@(string.IsNullOrWhiteSpace(d.MacAddress) ? "-" : d.MacAddress)</td>
+                        <td class="d-none d-lg-table-cell">@(string.IsNullOrWhiteSpace(d.MacAddress) ? "-" : d.MacAddress)</td>
                     }
 
                     <td class="device-status-cell">
                         @if (d.IsOnline)
                         {
-                            <span class="badge bg-success">Conectado</span>
+                            <span class="device-online"><span class="status-dot online"></span>Conectado</span>
                         }
                         else
                         {
-                            <span class="badge bg-secondary">Sin conexión</span>
+                            <span class="device-offline"><span class="status-dot offline"></span>Sin conexión</span>
                         }
                     </td>
-                    <td class="device-lastseen-cell" data-utc-datetime="@(AsUtcIso(d.LastSeenUtc) ?? "")"></td>
+                    <td class="device-lastseen-cell d-none d-sm-table-cell" data-utc-datetime="@(AsUtcIso(d.LastSeenUtc) ?? "")"></td>
                     <td>
                         <button class="btn btn-sm btn-outline-secondary btn-open-terminal"
                                 data-device-id="@d.DeviceId"
@@ -88,16 +89,17 @@
                     </td>
                     @if (isAdmin)
                     {
-                        <td class="device-signaltype-cell">@(d.LastSeenType?.ToString() ?? "-")</td>
-                        <td>@(d.IsEnabled ? "Sí" : "No")</td>
-                        <td>@(string.IsNullOrWhiteSpace(d.RegisteredByUserName) ? "-" : d.RegisteredByUserName)</td>
-                        <td data-utc-datetime="@(AsUtcIso(d.RegisteredAtUtc) ?? "")"></td>
+                        <td class="device-signaltype-cell d-none d-xl-table-cell">@(d.LastSeenType?.ToString() ?? "-")</td>
+                        <td class="d-none d-xl-table-cell">@(d.IsEnabled ? "Sí" : "No")</td>
+                        <td class="d-none d-xl-table-cell">@(string.IsNullOrWhiteSpace(d.RegisteredByUserName) ? "-" : d.RegisteredByUserName)</td>
+                        <td class="d-none d-xl-table-cell" data-utc-datetime="@(AsUtcIso(d.RegisteredAtUtc) ?? "")"></td>
                     }
                 </tr>
             }
         }
     </tbody>
 </table>
+</div>
 
 @* Modal terminal *@
 <div class="modal fade" id="terminalModal" tabindex="-1" aria-labelledby="terminalModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
@@ -177,8 +179,8 @@
             const statusCell = row.querySelector(".device-status-cell");
             if (statusCell)
                 statusCell.innerHTML = state.isOnline
-                    ? '<span class="badge bg-success">Conectado</span>'
-                    : '<span class="badge bg-secondary">Sin conexión</span>';
+                    ? '<span class="device-online"><span class="status-dot online"></span>Conectado</span>'
+                    : '<span class="device-offline"><span class="status-dot offline"></span>Sin conexión</span>';
 
             const lastSeenCell = row.querySelector(".device-lastseen-cell");
             if (lastSeenCell && state.lastSeenUtc) {

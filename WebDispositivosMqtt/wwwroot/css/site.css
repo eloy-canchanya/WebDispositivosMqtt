@@ -1,15 +1,21 @@
-html {
-  font-size: 14px;
-}
+html { font-size: 14px; }
 
 @media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
+  html { font-size: 16px; }
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+:root {
+  --dash-bg:           #0d1117;
+  --dash-surface:      #161b22;
+  --dash-card:         #1c2128;
+  --dash-border:       #30363d;
+  --dash-text:         #e6edf3;
+  --dash-muted:        #8b949e;
+  --dash-accent:       #388bfd;
+  --dash-accent-glow:  rgba(56, 139, 253, 0.2);
+  --dash-green:        #3fb950;
+  --dash-red:          #f85149;
+  --dash-yellow:       #d29922;
 }
 
 html {
@@ -18,14 +24,216 @@ html {
 }
 
 body {
+  background-color: var(--dash-bg);
+  color: var(--dash-text);
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   margin-bottom: 60px;
+  -webkit-font-smoothing: antialiased;
 }
 
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
+/* ── Scrollbar ─────────────────────────────────── */
+::-webkit-scrollbar              { width: 6px; height: 6px; }
+::-webkit-scrollbar-track        { background: var(--dash-bg); }
+::-webkit-scrollbar-thumb        { background: var(--dash-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover  { background: var(--dash-muted); }
+
+/* ── Navbar ────────────────────────────────────── */
+.navbar {
+  background-color: var(--dash-surface) !important;
+  border-color: var(--dash-border) !important;
+  box-shadow: 0 1px 0 var(--dash-border);
+}
+
+.navbar-brand {
+  color: var(--dash-text) !important;
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  letter-spacing: -0.01em;
+}
+
+.navbar-brand .brand-icon {
+  width: 26px;
+  height: 26px;
+  background: var(--dash-accent);
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nav-link {
+  color: var(--dash-muted) !important;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.6rem 0.75rem !important;
+  transition: color 0.15s;
+  border-bottom: 2px solid transparent;
+}
+
+.nav-link:hover { color: var(--dash-text) !important; }
+
+.nav-link.active-nav {
+  color: var(--dash-accent) !important;
+  border-bottom-color: var(--dash-accent);
+}
+
+/* ── Headings ──────────────────────────────────── */
+h1, h2, h3 {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+h1.display-6 { font-size: 1.35rem; }
+
+/* ── Cards ─────────────────────────────────────── */
+.card {
+  background-color: var(--dash-card);
+  border-color: var(--dash-border);
+}
+
+.card-header {
+  border-color: var(--dash-border);
+  background-color: rgba(255, 255, 255, 0.03);
+  font-weight: 500;
+}
+
+/* ── Tables ────────────────────────────────────── */
+.table {
+  --bs-table-bg:          transparent;
+  --bs-table-striped-bg:  rgba(255, 255, 255, 0.025);
+  --bs-table-hover-bg:    rgba(56, 139, 253, 0.07);
+  --bs-table-border-color: var(--dash-border);
+  font-size: 0.875rem;
+}
+
+.table thead th {
+  color: var(--dash-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom-width: 1px;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.table tbody tr { transition: background-color 0.1s; }
+
+/* ── Status dot (dispositivos) ─────────────────── */
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.status-dot.online {
+  background: var(--dash-green);
+  animation: pulse-green 2s ease-in-out infinite;
+}
+
+.status-dot.offline { background: var(--dash-muted); }
+
+@keyframes pulse-green {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.5); }
+  50%       { box-shadow: 0 0 0 5px rgba(63, 185, 80, 0); }
+}
+
+.device-online {
+  color: var(--dash-green);
+  font-size: 0.82rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+}
+
+.device-offline {
+  color: var(--dash-muted);
+  font-size: 0.82rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ── Código (MAC, etc.) ────────────────────────── */
+code {
+  color: var(--dash-accent);
+  background: rgba(56, 139, 253, 0.1);
+  padding: 0.15em 0.45em;
+  border-radius: 4px;
+  font-size: 0.82em;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+}
+
+/* ── Badges ────────────────────────────────────── */
+.badge {
+  font-weight: 500;
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+  padding: 0.3em 0.65em;
+  border-radius: 4px;
+}
+
+/* ── Forms ─────────────────────────────────────── */
+.form-control, .form-select {
+  background-color: var(--dash-card);
+  border-color: var(--dash-border);
+  color: var(--dash-text);
+  font-size: 0.875rem;
+}
+
+.form-control:focus, .form-select:focus {
+  background-color: var(--dash-card);
+  border-color: var(--dash-accent);
+  color: var(--dash-text);
+  box-shadow: 0 0 0 3px var(--dash-accent-glow);
+}
+
+.form-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--dash-muted);
+  letter-spacing: 0.02em;
+}
+
+/* ── Focus general ─────────────────────────────── */
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 3px var(--dash-accent-glow);
+}
+
+/* ── Footer ────────────────────────────────────── */
+.footer {
+  border-color: var(--dash-border) !important;
+  color: var(--dash-muted);
+  font-size: 0.78rem;
+}
+
+/* ── Alerts / Banners ──────────────────────────── */
+.alert { font-size: 0.875rem; border-radius: 6px; }
+
+/* ── Modal ─────────────────────────────────────── */
+.modal-content {
+  border-color: var(--dash-border);
+  border-radius: 10px;
+}
+
+.modal-header { border-color: var(--dash-border); }
+.modal-footer { border-color: var(--dash-border); }
+
+/* ── Form floating placeholders ────────────────── */
+.form-floating > .form-control-plaintext::placeholder,
+.form-floating > .form-control::placeholder {
   color: var(--bs-secondary-color);
   text-align: end;
 }
 
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
+.form-floating > .form-control-plaintext:focus::placeholder,
+.form-floating > .form-control:focus::placeholder {
   text-align: start;
 }

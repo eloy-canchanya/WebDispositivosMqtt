@@ -12,16 +12,17 @@
             <span id="hubBannerMsg"></span>
         </div>
 
-        <table class="table table-bordered align-middle">
-            <thead class="table-light">
+        <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
                 <tr>
                     <th>MAC</th>
                     <th>Clave</th>
-                    <th>Solicitado</th>
+                    <th class="d-none d-md-table-cell">Solicitado</th>
                     <th>Estado</th>
                     <th>Dispositivo</th>
                     <th>Password</th>
-                    <th>Entregado</th>
+                    <th>Entrega</th>
                 </tr>
             </thead>
             <tbody id="requestsBody">
@@ -30,6 +31,7 @@
                 </tr>
             </tbody>
         </table>
+        </div>
     </div>
 </div>
 
@@ -160,7 +162,7 @@
 
             const canOpen = r.isRegistered && r.hasPassword && r.status === 'Pending';
             const btn = canOpen
-                ? `<br><button class="btn btn-sm btn-outline-success mt-1" onclick="openWindow('${r.id}')">Abrir ventana</button>`
+                ? `<br><button class="btn btn-sm btn-outline-success mt-1" onclick="openWindow('${r.id}')">Abrir</button>`
                 : '';
 
             return badge + btn;
@@ -184,7 +186,7 @@
                 tr.innerHTML = `
                     <td><code>${r.macAddress}</code></td>
                     <td><strong>${r.keyword}</strong></td>
-                    <td data-utc-datetime="${r.createdAtUtc}">${window.appFormatUtcDateTime(r.createdAtUtc)}</td>
+                    <td class="d-none d-md-table-cell" data-utc-datetime="${r.createdAtUtc}">${window.appFormatUtcDateTime(r.createdAtUtc)}</td>
                     <td>${statusCell(r)}</td>
                     <td>${deviceCell(r)}</td>
                     <td>${passwordCell(r)}</td>

@@ -31,16 +31,17 @@
     <div class="alert alert-danger">@errMsg</div>
 }
 
+<div class="table-responsive">
 <table class="table table-striped align-middle">
     <thead>
         <tr>
             <th>Nombre</th>
             <th>MAC</th>
-            <th>Habilitado</th>
-            <th>Registrado por</th>
-            <th>Fecha registro</th>
+            <th class="d-none d-md-table-cell">Habilitado</th>
+            <th class="d-none d-lg-table-cell">Registrado por</th>
+            <th class="d-none d-lg-table-cell">Fecha registro</th>
             <th>Password</th>
-            <th>DynSec</th>
+            <th class="d-none d-md-table-cell">DynSec</th>
             <th>Entregado</th>
         </tr>
     </thead>
@@ -58,9 +59,9 @@
                 <tr>
                     <td>@d.Name</td>
                     <td><code>@d.MacAddress</code></td>
-                    <td>@(d.IsEnabled ? "Sí" : "No")</td>
-                    <td>@d.RegisteredByUserName</td>
-                    <td data-utc-datetime="@(AsUtcIso(d.RegisteredAtUtc) ?? "")"></td>
+                    <td class="d-none d-md-table-cell">@(d.IsEnabled ? "Sí" : "No")</td>
+                    <td class="d-none d-lg-table-cell">@d.RegisteredByUserName</td>
+                    <td class="d-none d-lg-table-cell" data-utc-datetime="@(AsUtcIso(d.RegisteredAtUtc) ?? "")"></td>
                     <td>
                         @if (d.HasPassword)
                         {
@@ -82,7 +83,7 @@
                             </button>
                         </form>
                     </td>
-                    <td>
+                    <td class="d-none d-md-table-cell">
                         <span class="badge bg-secondary dynsec-badge" data-mac="@d.MacAddress">—</span>
                         <button class="btn btn-sm btn-outline-secondary btn-verify-dynsec ms-1"
                                 data-mac="@d.MacAddress" title="Verificar DynSec">
@@ -118,6 +119,7 @@
         }
     </tbody>
 </table>
+</div>
 
 @section Scripts {
     <script>
