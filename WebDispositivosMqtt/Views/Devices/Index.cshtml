@@ -20,12 +20,12 @@
 }
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="mb-0">Dispositivos</h2>
+    <h2 class="mb-0">Conexiones</h2>
 </div>
 
-<div class="mb-3">
-    <strong>Estado conexión hub:</strong>
-    <span id="hubStatus" class="badge bg-warning text-dark">Desconectado</span>
+<div id="hubBanner" class="alert alert-warning py-2 px-3 mb-0 rounded-0 d-none"
+     style="position:sticky; top:0; z-index:1030;" role="alert">
+    <span id="hubBannerMsg"></span>
 </div>
 
 <table class="table table-striped align-middle">
@@ -100,7 +100,7 @@
 </table>
 
 @* Modal terminal *@
-<div class="modal fade" id="terminalModal" tabindex="-1" aria-labelledby="terminalModalLabel" aria-hidden="true">
+<div class="modal fade" id="terminalModal" tabindex="-1" aria-labelledby="terminalModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content" style="background-color:#1e1e1e; color:#e5e7eb; border-color:#444;">
             <div class="modal-header" style="border-color:#444;">
@@ -140,7 +140,16 @@
         const aft = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? "";
 
         // ─── Tabla: estado de dispositivos ───────────────────────────────────
-        const hubStatus       = document.getElementById("hubStatus");
+        const hubBanner    = document.getElementById("hubBanner");
+        const hubBannerMsg = document.getElementById("hubBannerMsg");
+
+        function showBanner(msg, type) {
+            hubBannerMsg.textContent = msg;
+            hubBanner.className = `alert py-2 px-3 mb-0 rounded-0 alert-${type}`;
+        }
+        function hideBanner() {
+            hubBanner.classList.add("d-none");
+        }
         const rowsByDeviceKey = new Map();
         const statusByKey     = new Map();
 
@@ -208,8 +217,11 @@
                 termUnlock();
                 termAppend("system", "Terminal lista. Escribe 'ayuda' para ver los comandos disponibles.");
                 bootstrap.Modal.getOrCreateInstance(terminalModal).show();
-                setTimeout(() => termInput.focus(), 350);
             });
+        });
+
+        terminalModal.addEventListener("shown.bs.modal", () => {
+            termInput.focus();
         });
 
         terminalModal.addEventListener("hidden.bs.modal", () => {
@@ -355,26 +367,21 @@
         });
 
         connection.onreconnecting(() => {
-            hubStatus.textContent = "Reconectando";
-            hubStatus.className   = "badge bg-warning text-dark";
+            showBanner("Sin conexión en tiempo real — reconectando…", "warning");
         });
         connection.onreconnected(() => {
-            hubStatus.textContent = "Conectado";
-            hubStatus.className   = "badge bg-success";
+            hideBanner();
         });
         connection.onclose(() => {
-            hubStatus.textContent = "Desconectado";
-            hubStatus.className   = "badge bg-danger";
+            showBanner("Sin conexión en tiempo real — recarga la página si los estados no se actualizan.", "danger");
         });
 
         (async () => {
             try {
                 await connection.start();
-                hubStatus.textContent = "Conectado";
-                hubStatus.className   = "badge bg-success";
+                hideBanner();
             } catch {
-                hubStatus.textContent = "Error al conectar";
-                hubStatus.className   = "badge bg-danger";
+                showBanner("No se pudo establecer la conexión en tiempo real — recarga la página.", "danger");
             }
         })();
     </script>

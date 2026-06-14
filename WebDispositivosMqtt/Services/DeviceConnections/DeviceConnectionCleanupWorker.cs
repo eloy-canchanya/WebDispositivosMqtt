@@ -3,12 +3,14 @@
     public class DeviceConnectionCleanupWorker : BackgroundService
     {
         private readonly IDeviceConnectionService _service;
-        private readonly TimeSpan antiguedad = TimeSpan.FromSeconds(20);
-        private readonly TimeSpan periodo = TimeSpan.FromSeconds(30);
+        private readonly TimeSpan antiguedad;
+        private readonly TimeSpan periodo;
 
-        public DeviceConnectionCleanupWorker(IDeviceConnectionService service)
+        public DeviceConnectionCleanupWorker(IDeviceConnectionService service, IConfiguration configuration)
         {
             _service = service;
+            antiguedad = TimeSpan.FromSeconds(configuration.GetValue<int>("DeviceConnectionCleanup:AntiguedadSeconds", 20));
+            periodo    = TimeSpan.FromSeconds(configuration.GetValue<int>("DeviceConnectionCleanup:PeriodoSeconds", 30));
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)

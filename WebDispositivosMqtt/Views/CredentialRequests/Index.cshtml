@@ -6,7 +6,10 @@
     <div class="col-md-12">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h1 class="display-6 mb-0">Solicitudes de credenciales</h1>
-            <span id="hubStatus" class="badge bg-warning text-dark">Desconectado</span>
+        </div>
+
+        <div id="hubBanner" class="alert py-2 px-3 mb-3 d-none" role="alert">
+            <span id="hubBannerMsg"></span>
         </div>
 
         <table class="table table-bordered align-middle">
@@ -64,7 +67,16 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
     <script>
         const requestsBody    = document.getElementById('requestsBody');
-        const hubStatus       = document.getElementById('hubStatus');
+        const hubBanner    = document.getElementById('hubBanner');
+        const hubBannerMsg = document.getElementById('hubBannerMsg');
+
+        function showBanner(msg, type) {
+            hubBannerMsg.textContent = msg;
+            hubBanner.className = `alert py-2 px-3 mb-3 alert-${type}`;
+        }
+        function hideBanner() {
+            hubBanner.classList.add('d-none');
+        }
         const toastContainer  = document.getElementById('toastContainer');
         const registerModalEl = document.getElementById('registerModal');
         const registerModal   = new bootstrap.Modal(registerModalEl);
@@ -336,18 +348,16 @@
             if (requestsMap.delete(payload.id)) renderRequests();
         });
 
-        connection.onreconnecting(() => { hubStatus.textContent = 'Reconectando'; hubStatus.className = 'badge bg-warning text-dark'; });
-        connection.onreconnected(() => { hubStatus.textContent = 'Conectado'; hubStatus.className = 'badge bg-success'; });
-        connection.onclose(() => { hubStatus.textContent = 'Desconectado'; hubStatus.className = 'badge bg-danger'; });
+        connection.onreconnecting(() => { showBanner('Sin conexión en tiempo real — reconectando…', 'warning'); });
+        connection.onreconnected(() => { hideBanner(); });
+        connection.onclose(() => { showBanner('Sin conexión en tiempo real — recarga la página si las solicitudes no se actualizan.', 'danger'); });
 
         (async () => {
             try {
                 await connection.start();
-                hubStatus.textContent = 'Conectado';
-                hubStatus.className = 'badge bg-success';
+                hideBanner();
             } catch {
-                hubStatus.textContent = 'Error al conectar';
-                hubStatus.className = 'badge bg-danger';
+                showBanner('No se pudo establecer la conexión en tiempo real — recarga la página.', 'danger');
             } finally {
                 await loadRequests();
             }
