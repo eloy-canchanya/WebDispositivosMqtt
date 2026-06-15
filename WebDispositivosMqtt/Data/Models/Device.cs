@@ -25,6 +25,14 @@ public partial class Device
 
     public bool IsDelivered { get; set; }
 
+    public int? DeviceTypeId { get; set; }
+
+    public virtual ICollection<CloradorResumenDiario> CloradorResumenDiarios { get; set; } = new List<CloradorResumenDiario>();
+
+    public virtual ICollection<CloradorSecuencium> CloradorSecuencia { get; set; } = new List<CloradorSecuencium>();
+
+    public virtual DeviceType DeviceType { get; set; }
+
     public virtual AspNetUser RegisteredByUser { get; set; }
 
     public virtual ICollection<UserDevice> UserDevices { get; set; } = new List<UserDevice>();

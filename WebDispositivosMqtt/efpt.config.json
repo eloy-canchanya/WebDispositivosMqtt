@@ -19,7 +19,23 @@
    "T4TemplatePath": null,
    "Tables": [
       {
+         "Name": "[dbo].[CloradorResumenDiario]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[CloradorSecuencia]",
+         "ObjectType": 0
+      },
+      {
          "Name": "[dbo].[Devices]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[DeviceTypes]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[TelemetryLog]",
          "ObjectType": 0
       },
       {

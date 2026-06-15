@@ -16,7 +16,15 @@ public partial class DatabaseContext : DbContext
 
     public virtual DbSet<AspNetUser> AspNetUsers { get; set; }
 
+    public virtual DbSet<CloradorResumenDiario> CloradorResumenDiarios { get; set; }
+
+    public virtual DbSet<CloradorSecuencium> CloradorSecuencia { get; set; }
+
     public virtual DbSet<Device> Devices { get; set; }
+
+    public virtual DbSet<DeviceType> DeviceTypes { get; set; }
+
+    public virtual DbSet<TelemetryLog> TelemetryLogs { get; set; }
 
     public virtual DbSet<UserDevice> UserDevices { get; set; }
 
@@ -38,6 +46,37 @@ public partial class DatabaseContext : DbContext
             entity.Property(e => e.NormalizedEmail).HasMaxLength(256);
             entity.Property(e => e.NormalizedUserName).HasMaxLength(256);
             entity.Property(e => e.UserName).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<CloradorResumenDiario>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__Clorador__3214EC074C55709B");
+
+            entity.ToTable("CloradorResumenDiario");
+
+            entity.HasIndex(e => new { e.DeviceId, e.Dia }, "UQ_CloradorResumenDiario_Device_Dia").IsUnique();
+
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("(getutcdate())");
+
+            entity.HasOne(d => d.Device).WithMany(p => p.CloradorResumenDiarios)
+                .HasForeignKey(d => d.DeviceId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_CloradorResumenDiario_Device");
+        });
+
+        modelBuilder.Entity<CloradorSecuencium>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__Clorador__3214EC07DEE0121E");
+
+            entity.HasIndex(e => new { e.DeviceId, e.Ts }, "IX_CloradorSecuencia_DeviceId_Ts").IsDescending(false, true);
+
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.TriggerType).HasMaxLength(20);
+
+            entity.HasOne(d => d.Device).WithMany(p => p.CloradorSecuencia)
+                .HasForeignKey(d => d.DeviceId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_CloradorSecuencia_Device");
         });
 
         modelBuilder.Entity<Device>(entity =>
@@ -67,10 +106,45 @@ public partial class DatabaseContext : DbContext
                 .IsRequired()
                 .HasMaxLength(450);
 
+            entity.HasOne(d => d.DeviceType).WithMany(p => p.Devices)
+                .HasForeignKey(d => d.DeviceTypeId)
+                .HasConstraintName("FK_Devices_DeviceType");
+
             entity.HasOne(d => d.RegisteredByUser).WithMany(p => p.Devices)
                 .HasForeignKey(d => d.RegisteredByUserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Device_AspNetUsers_RegisteredBy");
+        });
+
+        modelBuilder.Entity<DeviceType>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__DeviceTy__3214EC07D0000D4E");
+
+            entity.HasIndex(e => e.Name, "UQ_DeviceTypes_Name").IsUnique();
+
+            entity.Property(e => e.Description).HasMaxLength(200);
+            entity.Property(e => e.Name)
+                .IsRequired()
+                .HasMaxLength(50);
+            entity.Property(e => e.TelemetrySp).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<TelemetryLog>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__Telemetr__3214EC07D1A9E0D4");
+
+            entity.ToTable("TelemetryLog");
+
+            entity.HasIndex(e => e.Processed, "IX_TelemetryLog_Processed");
+
+            entity.HasIndex(e => e.ReceivedAtUtc, "IX_TelemetryLog_ReceivedAtUtc").IsDescending();
+
+            entity.Property(e => e.ErrorMessage).HasMaxLength(2000);
+            entity.Property(e => e.Payload).IsRequired();
+            entity.Property(e => e.ReceivedAtUtc).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.Topic)
+                .IsRequired()
+                .HasMaxLength(500);
         });
 
         modelBuilder.Entity<UserDevice>(entity =>

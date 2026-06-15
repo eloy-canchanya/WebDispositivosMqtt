@@ -23,7 +23,7 @@ namespace WebDispositivosMqtt.Services.Devices
 
     public interface IDeviceConnectionService
     {
-        Task EvaluateTopicAsync(string domain, string entityId, string resource, string acknowledge, string payload);
+        Task EvaluateTopicAsync(string domain, string entityId, string resource, string subtype, string payload);
         Task CleanupExpiredAsync(TimeSpan ts);
         IReadOnlyCollection<DeviceConnectionState> GetAll();
     }
@@ -32,7 +32,7 @@ namespace WebDispositivosMqtt.Services.Devices
     {
         private readonly ConcurrentDictionary<string, DeviceConnectionState> _deviceConnections = new();
 
-        public async Task EvaluateTopicAsync(string domain, string entityId, string resource, string acknowledge, string payload)
+        public async Task EvaluateTopicAsync(string domain, string entityId, string resource, string subtype, string payload)
         {
             if (resource == "status" && (payload == "online" || payload == "offline"))
             {

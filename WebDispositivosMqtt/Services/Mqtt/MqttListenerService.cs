@@ -3,31 +3,33 @@ using MQTTnet;
 using MQTTnet.Protocol;
 using WebDispositivosMqtt.Services.Commands;
 using WebDispositivosMqtt.Services.Devices;
+using WebDispositivosMqtt.Services.Telemetria;
 using WebDispositivosMqtt.Utils;
 
 namespace WebDispositivosMqtt.Services.Mqtt
 {
     public class MqttListenerService : BackgroundService
     {
-        private readonly record struct TopicParts(string Domain, string EntityId, string Resource, string? Action);
-
         private readonly MqttOptions _options;
         private readonly ILogger<MqttListenerService> _logger;
         private IMqttClient? _mqttClient;
         private readonly IDeviceConnectionService _deviceConnectionService;
         private readonly ICommandAckService _commandAckService;
+        private readonly IServiceScopeFactory _scopeFactory;
         private int _reconnecting = 0;
 
         public MqttListenerService(
             IOptions<MqttOptions> options,
             ILogger<MqttListenerService> logger,
             IDeviceConnectionService devConnService,
-            ICommandAckService commandAckService)
+            ICommandAckService commandAckService,
+            IServiceScopeFactory scopeFactory)
         {
             _options = options.Value;
             _logger = logger;
             _deviceConnectionService = devConnService;
             _commandAckService = commandAckService;
+            _scopeFactory = scopeFactory;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -41,9 +43,8 @@ namespace WebDispositivosMqtt.Services.Mqtt
                 var topic = eventArgs.ApplicationMessage.Topic;
                 var payload = eventArgs.ApplicationMessage.ConvertPayloadToString() ?? string.Empty;
 
-
                 var segments = topic.Split('/', StringSplitOptions.RemoveEmptyEntries);
- 
+
                 if (segments.Length is < 3 or > 4)
                 {
                     return;
@@ -52,7 +53,7 @@ namespace WebDispositivosMqtt.Services.Mqtt
                 string domain = segments[0];
                 string entityId = segments[1];
                 string resource = segments[2];
-                string acknowledge = segments.Length > 3 ? segments[3] : string.Empty;
+                string subtype = segments.Length > 3 ? segments[3] : string.Empty;
 
 
                 if (domain != "devices")
@@ -66,19 +67,22 @@ namespace WebDispositivosMqtt.Services.Mqtt
                     return;
                 }
 
-                if (resource == "commands" && acknowledge == "ack")
+                if (resource == "commands" && subtype == "ack")
                 {
                     await _commandAckService.AcknowledgeAsync(entityId, payload);
                 }
+                else if (resource == "tel")
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var telemetriaService = scope.ServiceProvider.GetRequiredService<ITelemetriaService>();
+                    await telemetriaService.ProcesarAsync(entityId, topic, payload);
+                }
                 else
                 {
-                    await _deviceConnectionService.EvaluateTopicAsync(domain, entityId, resource, acknowledge, payload);
+                    await _deviceConnectionService.EvaluateTopicAsync(domain, entityId, resource, subtype, payload);
                 }
 
                 _logger.LogInformation("MQTT recibido. Topic: {Topic} Payload: {Payload}", topic, payload);
-
-
-
             };
 
             _mqttClient.ConnectedAsync += async _ =>

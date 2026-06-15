@@ -10,6 +10,7 @@ using WebDispositivosMqtt.Services.Provisioning;
 using WebDispositivosMqtt.Services.DeviceRequests;
 using WebDispositivosMqtt.Services.Dynsec;
 using WebDispositivosMqtt.Services.Commands;
+using WebDispositivosMqtt.Services.Telemetria;
 
 namespace WebDispositivosMqtt
 {
@@ -81,6 +82,9 @@ namespace WebDispositivosMqtt
 
             // Servicio de gestión de usuarios dynsec en Mosquitto
             builder.Services.AddScoped<IDynsecService, DynsecService>();
+
+            // Servicio de telemetría de dispositivos
+            builder.Services.AddScoped<ITelemetriaService, TelemetriaService>();
 
 
             var app = builder.Build();
