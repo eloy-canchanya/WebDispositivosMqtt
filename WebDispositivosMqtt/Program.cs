@@ -1,5 +1,8 @@
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using WebDispositivosMqtt.Hubs;
 using WebDispositivosMqtt.Identity;
 using WebDispositivosMqtt.DataIdentity.Models;
@@ -11,6 +14,9 @@ using WebDispositivosMqtt.Services.DeviceRequests;
 using WebDispositivosMqtt.Services.Dynsec;
 using WebDispositivosMqtt.Services.Commands;
 using WebDispositivosMqtt.Services.Telemetria;
+using WebDispositivosMqtt.Services.Auth;
+using FirebaseAdmin;
+using Google.Apis.Auth.OAuth2;
 
 namespace WebDispositivosMqtt
 {
@@ -85,6 +91,39 @@ namespace WebDispositivosMqtt
 
             // Servicio de telemetría de dispositivos
             builder.Services.AddScoped<ITelemetriaService, TelemetriaService>();
+
+            // JWT Auth para API móvil
+            builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
+            builder.Services.AddScoped<ITokenService, TokenService>();
+            builder.Services.AddAuthentication()
+                .AddJwtBearer(options =>
+                {
+                    var jwt = builder.Configuration.GetSection("Jwt");
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidateAudience = true,
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+                        ValidIssuer = jwt["Issuer"],
+                        ValidAudience = jwt["Audience"],
+                        IssuerSigningKey = new SymmetricSecurityKey(
+                            Encoding.UTF8.GetBytes(jwt["Key"]!))
+                    };
+                });
+
+            // Firebase FCM
+            var firebaseCredential = GoogleCredential
+                .FromFile("clorador-alertas-firebase-adminsdk-fbsvc-e0bb8f1385.json")
+                .CreateScoped(
+                    "https://www.googleapis.com/auth/cloud-platform",
+                    "https://www.googleapis.com/auth/firebase.messaging"
+                );
+            FirebaseApp.Create(new AppOptions
+            {
+                Credential = firebaseCredential,
+                ProjectId = "clorador-alertas"
+            });
 
 
             var app = builder.Build();

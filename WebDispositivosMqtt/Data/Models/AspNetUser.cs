@@ -39,5 +39,7 @@ public partial class AspNetUser
 
     public virtual ICollection<Device> Devices { get; set; } = new List<Device>();
 
+    public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+
     public virtual ICollection<UserDevice> UserDevices { get; set; } = new List<UserDevice>();
 }

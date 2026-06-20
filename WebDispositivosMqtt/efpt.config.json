@@ -35,6 +35,10 @@
          "ObjectType": 0
       },
       {
+         "Name": "[dbo].[RefreshTokens]",
+         "ObjectType": 0
+      },
+      {
          "Name": "[dbo].[TelemetryLog]",
          "ObjectType": 0
       },

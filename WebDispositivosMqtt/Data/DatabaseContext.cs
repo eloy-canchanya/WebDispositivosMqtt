@@ -24,6 +24,8 @@ public partial class DatabaseContext : DbContext
 
     public virtual DbSet<DeviceType> DeviceTypes { get; set; }
 
+    public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
+
     public virtual DbSet<TelemetryLog> TelemetryLogs { get; set; }
 
     public virtual DbSet<UserDevice> UserDevices { get; set; }
@@ -127,6 +129,27 @@ public partial class DatabaseContext : DbContext
                 .IsRequired()
                 .HasMaxLength(50);
             entity.Property(e => e.TelemetrySp).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasIndex(e => e.UserId, "IX_RefreshTokens_UserId");
+
+            entity.HasIndex(e => e.Token, "UQ_RefreshTokens_Token").IsUnique();
+
+            entity.Property(e => e.CreatedAtUtc)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())", "DF_RefreshTokens_CreatedAtUtc");
+            entity.Property(e => e.ExpiresAtUtc).HasPrecision(0);
+            entity.Property(e => e.RevokedAtUtc).HasPrecision(0);
+            entity.Property(e => e.Token)
+                .IsRequired()
+                .HasMaxLength(500);
+            entity.Property(e => e.UserId).IsRequired();
+
+            entity.HasOne(d => d.User).WithMany(p => p.RefreshTokens)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("FK_RefreshTokens_AspNetUsers");
         });
 
         modelBuilder.Entity<TelemetryLog>(entity =>
