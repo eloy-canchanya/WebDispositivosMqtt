@@ -24,6 +24,8 @@ public partial class DatabaseContext : DbContext
 
     public virtual DbSet<DeviceType> DeviceTypes { get; set; }
 
+    public virtual DbSet<FcmToken> FcmTokens { get; set; }
+
     public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
 
     public virtual DbSet<TelemetryLog> TelemetryLogs { get; set; }
@@ -129,6 +131,28 @@ public partial class DatabaseContext : DbContext
                 .IsRequired()
                 .HasMaxLength(50);
             entity.Property(e => e.TelemetrySp).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<FcmToken>(entity =>
+        {
+            entity.HasIndex(e => e.UserId, "IX_FcmTokens_UserId");
+
+            entity.HasIndex(e => e.Token, "UQ_FcmTokens_Token").IsUnique();
+
+            entity.Property(e => e.CreatedAtUtc)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())", "DF_FcmTokens_CreatedAtUtc");
+            entity.Property(e => e.LastUsedAtUtc)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())", "DF_FcmTokens_LastUsedAtUtc");
+            entity.Property(e => e.Token)
+                .IsRequired()
+                .HasMaxLength(500);
+            entity.Property(e => e.UserId).IsRequired();
+
+            entity.HasOne(d => d.User).WithMany(p => p.FcmTokens)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("FK_FcmTokens_AspNetUsers");
         });
 
         modelBuilder.Entity<RefreshToken>(entity =>

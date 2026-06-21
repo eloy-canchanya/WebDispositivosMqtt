@@ -1,53 +1,91 @@
-using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using FirebaseAdmin.Messaging;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using WebDispositivosMqtt.Data;
+using WebDispositivosMqtt.Data.Models;
 
 namespace WebDispositivosMqtt.Controllers.Api;
 
 [ApiController]
-[Route("api/fcm")]
-public class FcmController : ControllerBase
+[Route("api/push-tokens")]
+[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+public class FcmController(DatabaseContext db) : ControllerBase
 {
-    // Almacenamiento en memoria para la prueba (reemplazar por BD después)
-    private static readonly List<string> _tokens = [];
-
-    // La app Android llama esto al iniciar con su FCM token
-    [HttpPost("registrar-token")]
-    public IActionResult RegistrarToken([FromBody] string token)
+    [HttpPost("register")]
+    public async Task<IActionResult> Register([FromBody] RegisterTokenRequest request)
     {
-        if (!_tokens.Contains(token))
-            _tokens.Add(token);
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        var existing = await db.FcmTokens
+            .FirstOrDefaultAsync(t => t.Token == request.Token);
+
+        if (existing is not null)
+        {
+            existing.UserId = userId;
+            existing.LastUsedAtUtc = DateTime.UtcNow;
+        }
+        else
+        {
+            db.FcmTokens.Add(new FcmToken
+            {
+                UserId = userId,
+                Token = request.Token,
+            });
+        }
+
+        await db.SaveChangesAsync();
+        return Ok();
+    }
+ 
+
+
+    [HttpDelete("unregister")]
+    public async Task<IActionResult> Unregister([FromBody] UnregisterTokenRequest request)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        var token = await db.FcmTokens
+            .FirstOrDefaultAsync(t => t.Token == request.Token && t.UserId == userId);
+
+        if (token is null)
+            return NotFound();
+
+        db.FcmTokens.Remove(token);
+        await db.SaveChangesAsync();
         return Ok();
     }
 
-    // Endpoint de prueba: envía notificación a todos los tokens registrados
+    [AllowAnonymous]
     [HttpPost("enviar-prueba")]
     public async Task<IActionResult> EnviarPrueba()
     {
-        if (_tokens.Count == 0)
-            return BadRequest("No hay tokens registrados");
+        var tokens = await db.FcmTokens.Select(t => t.Token).ToListAsync();
+        if (tokens.Count == 0)
+            return Ok(new { enviados = 0, mensaje = "No hay tokens registrados" });
 
-        var multicast = new MulticastMessage
+        var messages = tokens.Select(token => new Message
         {
-            Tokens = _tokens,
-            Notification = new Notification { Title = "Prueba FCM", Body = "Funciona!" }
-        };
-        var response = await FirebaseMessaging.DefaultInstance.SendEachForMulticastAsync(multicast);
+            Token = token,
+            Notification = new Notification
+            {
+                Title = "Prueba de notificación",
+                Body = "Notificación de prueba desde el servidor"
+            }
+        }).ToList();
 
-        var detalles = response.Responses.Select((r, i) => new {
-            token = _tokens[i][..20] + "...",
-            ok = r.IsSuccess,
-            error = r.Exception?.Message
-        });
+        var response = await FirebaseMessaging.DefaultInstance.SendEachAsync(messages);
 
-        return Ok(new {
+        return Ok(new
+        {
             enviados = response.SuccessCount,
             fallidos = response.FailureCount,
-            detalles
+            total = tokens.Count
         });
     }
-
-
-
-
-    
 }
+
+public record RegisterTokenRequest(string Token);
+public record UnregisterTokenRequest(string Token);
