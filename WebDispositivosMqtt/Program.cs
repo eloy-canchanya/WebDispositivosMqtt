@@ -116,10 +116,11 @@ namespace WebDispositivosMqtt
                     };
                 });
 
-            // Firebase FCM
-            var firebaseCredential = (Environment.GetEnvironmentVariable("FIREBASE_CREDENTIALS_JSON") is { } firebaseJson
-                ? GoogleCredential.FromJson(firebaseJson)
-                : GoogleCredential.FromFile("clorador-alertas-firebase-adminsdk-fbsvc-e0bb8f1385.json"))
+            var firebaseJson = builder.Configuration["Firebase:Credentials"]
+                ?? throw new InvalidOperationException("Firebase:Credentials no está configurado.");
+
+            var firebaseCredential = GoogleCredential
+                .FromJson(firebaseJson)
                 .CreateScoped(
                     "https://www.googleapis.com/auth/cloud-platform",
                     "https://www.googleapis.com/auth/firebase.messaging"
