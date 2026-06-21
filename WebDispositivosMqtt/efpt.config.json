@@ -19,6 +19,14 @@
    "T4TemplatePath": null,
    "Tables": [
       {
+         "Name": "[dbo].[AlarmReads]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Alarms]",
+         "ObjectType": 0
+      },
+      {
          "Name": "[dbo].[CloradorResumenDiario]",
          "ObjectType": 0
       },

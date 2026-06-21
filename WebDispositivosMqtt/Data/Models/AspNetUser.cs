@@ -37,6 +37,8 @@ public partial class AspNetUser
 
     public int AccessFailedCount { get; set; }
 
+    public virtual ICollection<AlarmRead> AlarmReads { get; set; } = new List<AlarmRead>();
+
     public virtual ICollection<Device> Devices { get; set; } = new List<Device>();
 
     public virtual ICollection<FcmToken> FcmTokens { get; set; } = new List<FcmToken>();

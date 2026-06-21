@@ -14,6 +14,7 @@ using WebDispositivosMqtt.Services.DeviceRequests;
 using WebDispositivosMqtt.Services.Dynsec;
 using WebDispositivosMqtt.Services.Commands;
 using WebDispositivosMqtt.Services.Telemetria;
+using WebDispositivosMqtt.Services.Alarms;
 using WebDispositivosMqtt.Services.Auth;
 using FirebaseAdmin;
 using Google.Apis.Auth.OAuth2;
@@ -91,6 +92,9 @@ namespace WebDispositivosMqtt
 
             // Servicio de telemetría de dispositivos
             builder.Services.AddScoped<ITelemetriaService, TelemetriaService>();
+
+            // Servicio de alarmas de dispositivos
+            builder.Services.AddScoped<IAlarmService, AlarmService>();
 
             // JWT Auth para API móvil
             builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));

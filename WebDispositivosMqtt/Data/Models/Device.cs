@@ -27,6 +27,8 @@ public partial class Device
 
     public int? DeviceTypeId { get; set; }
 
+    public virtual ICollection<Alarm> Alarms { get; set; } = new List<Alarm>();
+
     public virtual ICollection<CloradorResumenDiario> CloradorResumenDiarios { get; set; } = new List<CloradorResumenDiario>();
 
     public virtual ICollection<CloradorSecuencium> CloradorSecuencia { get; set; } = new List<CloradorSecuencium>();

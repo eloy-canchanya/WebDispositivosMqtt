@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Options;
 using MQTTnet;
 using MQTTnet.Protocol;
+using WebDispositivosMqtt.Services.Alarms;
 using WebDispositivosMqtt.Services.Commands;
 using WebDispositivosMqtt.Services.Devices;
 using WebDispositivosMqtt.Services.Telemetria;
@@ -76,6 +77,12 @@ namespace WebDispositivosMqtt.Services.Mqtt
                     using var scope = _scopeFactory.CreateScope();
                     var telemetriaService = scope.ServiceProvider.GetRequiredService<ITelemetriaService>();
                     await telemetriaService.ProcesarAsync(entityId, topic, payload);
+                }
+                else if (resource == "alarm")
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var alarmService = scope.ServiceProvider.GetRequiredService<IAlarmService>();
+                    await alarmService.ProcessAsync(entityId, payload);
                 }
                 else
                 {

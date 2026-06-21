@@ -14,6 +14,10 @@ public partial class DatabaseContext : DbContext
     {
     }
 
+    public virtual DbSet<Alarm> Alarms { get; set; }
+
+    public virtual DbSet<AlarmRead> AlarmReads { get; set; }
+
     public virtual DbSet<AspNetUser> AspNetUsers { get; set; }
 
     public virtual DbSet<CloradorResumenDiario> CloradorResumenDiarios { get; set; }
@@ -35,6 +39,53 @@ public partial class DatabaseContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.UseCollation("Latin1_General_100_CI_AS_SC");
+
+        modelBuilder.Entity<Alarm>(entity =>
+        {
+            entity.HasIndex(e => e.CreatedAtUtc, "IX_Alarms_CreatedAtUtc").IsDescending();
+
+            entity.HasIndex(e => e.DeviceId, "IX_Alarms_DeviceId");
+
+            entity.Property(e => e.CreatedAtUtc)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())", "DF_Alarms_CreatedAtUtc");
+            entity.Property(e => e.Description)
+                .IsRequired()
+                .HasMaxLength(500);
+            entity.Property(e => e.Type)
+                .IsRequired()
+                .HasMaxLength(50);
+
+            entity.HasOne(d => d.Device).WithMany(p => p.Alarms)
+                .HasForeignKey(d => d.DeviceId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Alarms_Devices");
+        });
+
+        modelBuilder.Entity<AlarmRead>(entity =>
+        {
+            entity.HasIndex(e => e.AlarmId, "IX_AlarmReads_AlarmId");
+
+            entity.HasIndex(e => e.UserId, "IX_AlarmReads_UserId");
+
+            entity.HasIndex(e => new { e.AlarmId, e.UserId }, "UQ_AlarmReads").IsUnique();
+
+            entity.Property(e => e.DismissedAtUtc).HasPrecision(0);
+            entity.Property(e => e.ReadAtUtc)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())", "DF_AlarmReads_ReadAtUtc");
+            entity.Property(e => e.UserId).IsRequired();
+
+            entity.HasOne(d => d.Alarm).WithMany(p => p.AlarmReads)
+                .HasForeignKey(d => d.AlarmId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_AlarmReads_Alarms");
+
+            entity.HasOne(d => d.User).WithMany(p => p.AlarmReads)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_AlarmReads_AspNetUsers");
+        });
 
         modelBuilder.Entity<AspNetUser>(entity =>
         {
