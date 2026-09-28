@@ -286,7 +286,7 @@
                     const r = requestsMap.get(id);
                     if (r) {
                         r.status = 'Approved';
-                        r.provisioningExpiresAt = data.provisioningExpiresAt;
+                        r.provisioningExpiresAtUtc = data.provisioningExpiresAtUtc;
                     }
                     renderRequests();
                     showToast('Ventana abierta. El dispositivo tiene 10 min para conectarse.');
@@ -328,7 +328,7 @@
                 isRegistered:          payload.isRegistered,
                 deviceId:              null,
                 deviceName:            null,
-                provisioningExpiresAt: null,
+                provisioningExpiresAtUtc: null,
                 hasPassword:           payload.hasPassword ?? false,
                 isDelivered:           payload.isDelivered ?? false
             });

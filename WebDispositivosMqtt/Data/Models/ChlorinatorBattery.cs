@@ -5,19 +5,17 @@ using System.Collections.Generic;
 
 namespace WebDispositivosMqtt.Data.Models;
 
-public partial class CloradorResumenDiario
+public partial class ChlorinatorBattery
 {
-    public int Id { get; set; }
+    public long Id { get; set; }
 
     public Guid DeviceId { get; set; }
 
-    public DateOnly Dia { get; set; }
+    public DateTime TsUtc { get; set; }
 
-    public int SecTotal { get; set; }
+    public decimal VoltageV { get; set; }
 
-    public int VueltasTotal { get; set; }
-
-    public DateTime UpdatedAt { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
 
     public virtual Device Device { get; set; }
 }

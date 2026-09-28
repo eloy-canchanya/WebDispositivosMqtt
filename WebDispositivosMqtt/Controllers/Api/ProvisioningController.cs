@@ -45,8 +45,8 @@ public class ProvisioningController : ControllerBase
         if (device is not null
             && device.IsEnabled
             && device.MqttCredential is not null
-            && device.ProvisioningExpiresAt is not null
-            && device.ProvisioningExpiresAt > DateTime.UtcNow
+            && device.ProvisioningExpiresAtUtc is not null
+            && device.ProvisioningExpiresAtUtc > DateTime.UtcNow
             && _deviceRequests.TryGetApproved(body.SessionId, out var approvedRequest))
         {
             var plainPassword = _provisioning.GetPlainPassword(device.MqttCredential);
@@ -56,7 +56,7 @@ public class ProvisioningController : ControllerBase
             if (!confirmed)
                 return StatusCode(500, new { error = "Error al asegurar el dispositivo en DynSec." });
 
-            device.ProvisioningExpiresAt = null;
+            device.ProvisioningExpiresAtUtc = null;
             device.IsDelivered = true;
             await _db.SaveChangesAsync();
 

@@ -21,7 +21,7 @@ public partial class Device
 
     public string MqttCredential { get; set; }
 
-    public DateTime? ProvisioningExpiresAt { get; set; }
+    public DateTime? ProvisioningExpiresAtUtc { get; set; }
 
     public bool IsDelivered { get; set; }
 
@@ -29,9 +29,15 @@ public partial class Device
 
     public virtual ICollection<Alarm> Alarms { get; set; } = new List<Alarm>();
 
-    public virtual ICollection<CloradorResumenDiario> CloradorResumenDiarios { get; set; } = new List<CloradorResumenDiario>();
+    public virtual ICollection<ChlorinatorBattery> ChlorinatorBatteries { get; set; } = new List<ChlorinatorBattery>();
 
-    public virtual ICollection<CloradorSecuencium> CloradorSecuencia { get; set; } = new List<CloradorSecuencium>();
+    public virtual ICollection<ChlorinatorDailySummary> ChlorinatorDailySummaries { get; set; } = new List<ChlorinatorDailySummary>();
+
+    public virtual ICollection<ChlorinatorDose> ChlorinatorDoses { get; set; } = new List<ChlorinatorDose>();
+
+    public virtual ICollection<ChlorinatorLevel> ChlorinatorLevels { get; set; } = new List<ChlorinatorLevel>();
+
+    public virtual ChlorinatorTank ChlorinatorTank { get; set; }
 
     public virtual DeviceType DeviceType { get; set; }
 

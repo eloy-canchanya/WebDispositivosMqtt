@@ -20,9 +20,15 @@ public partial class DatabaseContext : DbContext
 
     public virtual DbSet<AspNetUser> AspNetUsers { get; set; }
 
-    public virtual DbSet<CloradorResumenDiario> CloradorResumenDiarios { get; set; }
+    public virtual DbSet<ChlorinatorBattery> ChlorinatorBatteries { get; set; }
 
-    public virtual DbSet<CloradorSecuencium> CloradorSecuencia { get; set; }
+    public virtual DbSet<ChlorinatorDailySummary> ChlorinatorDailySummaries { get; set; }
+
+    public virtual DbSet<ChlorinatorDose> ChlorinatorDoses { get; set; }
+
+    public virtual DbSet<ChlorinatorLevel> ChlorinatorLevels { get; set; }
+
+    public virtual DbSet<ChlorinatorTank> ChlorinatorTanks { get; set; }
 
     public virtual DbSet<Device> Devices { get; set; }
 
@@ -103,35 +109,95 @@ public partial class DatabaseContext : DbContext
             entity.Property(e => e.UserName).HasMaxLength(256);
         });
 
-        modelBuilder.Entity<CloradorResumenDiario>(entity =>
+        modelBuilder.Entity<ChlorinatorBattery>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Clorador__3214EC074C55709B");
+            entity.ToTable("ChlorinatorBattery");
 
-            entity.ToTable("CloradorResumenDiario");
+            entity.HasIndex(e => new { e.DeviceId, e.TsUtc }, "IX_ChlorinatorBattery_DeviceId_TsUtc").IsDescending(false, true);
 
-            entity.HasIndex(e => new { e.DeviceId, e.Dia }, "UQ_CloradorResumenDiario_Device_Dia").IsUnique();
+            entity.Property(e => e.CreatedAtUtc)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())", "DF_ChlorinatorBattery_CreatedAtUtc");
+            entity.Property(e => e.TsUtc).HasPrecision(0);
+            entity.Property(e => e.VoltageV)
+                .HasColumnType("decimal(5, 2)")
+                .HasColumnName("Voltage_V");
 
-            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("(getutcdate())");
-
-            entity.HasOne(d => d.Device).WithMany(p => p.CloradorResumenDiarios)
+            entity.HasOne(d => d.Device).WithMany(p => p.ChlorinatorBatteries)
                 .HasForeignKey(d => d.DeviceId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_CloradorResumenDiario_Device");
+                .HasConstraintName("FK_ChlorinatorBattery_Device");
         });
 
-        modelBuilder.Entity<CloradorSecuencium>(entity =>
+        modelBuilder.Entity<ChlorinatorDailySummary>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Clorador__3214EC07DEE0121E");
+            entity.ToTable("ChlorinatorDailySummary");
 
-            entity.HasIndex(e => new { e.DeviceId, e.Ts }, "IX_CloradorSecuencia_DeviceId_Ts").IsDescending(false, true);
+            entity.HasIndex(e => new { e.DeviceId, e.Day }, "UQ_ChlorinatorDailySummary_DeviceId_Day").IsUnique();
 
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
-            entity.Property(e => e.TriggerType).HasMaxLength(20);
+            entity.Property(e => e.UpdatedAtUtc)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())", "DF_ChlorinatorDailySummary_UpdatedAtUtc");
 
-            entity.HasOne(d => d.Device).WithMany(p => p.CloradorSecuencia)
+            entity.HasOne(d => d.Device).WithMany(p => p.ChlorinatorDailySummaries)
                 .HasForeignKey(d => d.DeviceId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_CloradorSecuencia_Device");
+                .HasConstraintName("FK_ChlorinatorDailySummary_Device");
+        });
+
+        modelBuilder.Entity<ChlorinatorDose>(entity =>
+        {
+            entity.ToTable("ChlorinatorDose");
+
+            entity.HasIndex(e => new { e.DeviceId, e.TsUtc }, "IX_ChlorinatorDose_DeviceId_TsUtc").IsDescending(false, true);
+
+            entity.Property(e => e.CreatedAtUtc)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())", "DF_ChlorinatorDose_CreatedAtUtc");
+            entity.Property(e => e.TriggerType).HasMaxLength(20);
+            entity.Property(e => e.TsUtc).HasPrecision(0);
+
+            entity.HasOne(d => d.Device).WithMany(p => p.ChlorinatorDoses)
+                .HasForeignKey(d => d.DeviceId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ChlorinatorDose_Device");
+        });
+
+        modelBuilder.Entity<ChlorinatorLevel>(entity =>
+        {
+            entity.ToTable("ChlorinatorLevel");
+
+            entity.HasIndex(e => new { e.DeviceId, e.TsUtc }, "IX_ChlorinatorLevel_DeviceId_TsUtc").IsDescending(false, true);
+
+            entity.Property(e => e.CreatedAtUtc)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())", "DF_ChlorinatorLevel_CreatedAtUtc");
+            entity.Property(e => e.DistanceMm).HasColumnName("Distance_mm");
+            entity.Property(e => e.TsUtc).HasPrecision(0);
+
+            entity.HasOne(d => d.Device).WithMany(p => p.ChlorinatorLevels)
+                .HasForeignKey(d => d.DeviceId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ChlorinatorLevel_Device");
+        });
+
+        modelBuilder.Entity<ChlorinatorTank>(entity =>
+        {
+            entity.HasKey(e => e.DeviceId);
+
+            entity.ToTable("ChlorinatorTank");
+
+            entity.Property(e => e.DeviceId).ValueGeneratedNever();
+            entity.Property(e => e.EmptyDistanceMm).HasColumnName("EmptyDistance_mm");
+            entity.Property(e => e.FullDistanceMm).HasColumnName("FullDistance_mm");
+            entity.Property(e => e.UpdatedAtUtc)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())", "DF_ChlorinatorTank_UpdatedAtUtc");
+
+            entity.HasOne(d => d.Device).WithOne(p => p.ChlorinatorTank)
+                .HasForeignKey<ChlorinatorTank>(d => d.DeviceId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ChlorinatorTank_Device");
         });
 
         modelBuilder.Entity<Device>(entity =>
@@ -153,7 +219,7 @@ public partial class DatabaseContext : DbContext
             entity.Property(e => e.Name)
                 .IsRequired()
                 .HasMaxLength(100);
-            entity.Property(e => e.ProvisioningExpiresAt).HasColumnType("datetime");
+            entity.Property(e => e.ProvisioningExpiresAtUtc).HasPrecision(0);
             entity.Property(e => e.RegisteredAtUtc)
                 .HasPrecision(0)
                 .HasDefaultValueSql("(sysutcdatetime())", "DF_Device_RegisteredAtUtc");

@@ -5,7 +5,7 @@
    "FilterSchemas": false,
    "IncludeConnectionString": false,
    "IrregularWords": null,
-   "MinimumProductVersion": "2.6.1604",
+   "MinimumProductVersion": "2.6.1706",
    "ModelNamespace": null,
    "OutputContextPath": "Data",
    "OutputPath": "Data\/Models",
@@ -27,11 +27,23 @@
          "ObjectType": 0
       },
       {
-         "Name": "[dbo].[CloradorResumenDiario]",
+         "Name": "[dbo].[ChlorinatorBattery]",
          "ObjectType": 0
       },
       {
-         "Name": "[dbo].[CloradorSecuencia]",
+         "Name": "[dbo].[ChlorinatorDailySummary]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[ChlorinatorDose]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[ChlorinatorLevel]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[ChlorinatorTank]",
          "ObjectType": 0
       },
       {

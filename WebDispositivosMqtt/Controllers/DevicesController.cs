@@ -20,7 +20,7 @@ namespace WebDispositivosMqtt.Controllers
         bool IsEnabled,
         DateTime RegisteredAtUtc,
         string RegisteredByUserName,
-        DateTime? ProvisioningExpiresAt,
+        DateTime? ProvisioningExpiresAtUtc,
         bool HasPassword,
         bool IsDelivered);
 
@@ -129,7 +129,7 @@ namespace WebDispositivosMqtt.Controllers
                     d.IsEnabled,
                     d.RegisteredAtUtc,
                     d.RegisteredByUser!.UserName ?? "",
-                    d.ProvisioningExpiresAt,
+                    d.ProvisioningExpiresAtUtc,
                     d.MqttCredential != null,
                     d.IsDelivered))
                 .ToListAsync();
@@ -205,7 +205,7 @@ namespace WebDispositivosMqtt.Controllers
                 return RedirectToAction(nameof(Admin));
             }
 
-            device.ProvisioningExpiresAt = DateTime.UtcNow.AddMinutes(10);
+            device.ProvisioningExpiresAtUtc = DateTime.UtcNow.AddMinutes(10);
             await db.SaveChangesAsync();
 
             TempData["Ok"] = $"Ventana abierta para {device.Name}. El dispositivo tiene 10 minutos para provisionarse.";

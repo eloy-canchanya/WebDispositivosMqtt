@@ -5,19 +5,19 @@ using System.Collections.Generic;
 
 namespace WebDispositivosMqtt.Data.Models;
 
-public partial class CloradorSecuencium
+public partial class ChlorinatorDose
 {
-    public int Id { get; set; }
+    public long Id { get; set; }
 
     public Guid DeviceId { get; set; }
 
-    public DateTime Ts { get; set; }
+    public DateTime TsUtc { get; set; }
 
-    public int Vueltas { get; set; }
+    public int Turns { get; set; }
 
     public string TriggerType { get; set; }
 
-    public DateTime CreatedAt { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
 
     public virtual Device Device { get; set; }
 }

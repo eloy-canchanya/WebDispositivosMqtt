@@ -49,7 +49,7 @@ public class DeviceRequestsController : ControllerBase
 
         var dbDevices = await _db.Devices
             .Where(d => macs.Contains(d.MacAddress))
-            .Select(d => new { d.MacAddress, d.DeviceId, d.Name, d.ProvisioningExpiresAt, d.MqttCredential, d.IsDelivered })
+            .Select(d => new { d.MacAddress, d.DeviceId, d.Name, d.ProvisioningExpiresAtUtc, d.MqttCredential, d.IsDelivered })
             .ToListAsync();
 
         var dbDict = dbDevices.ToDictionary(d => d.MacAddress);
@@ -67,7 +67,7 @@ public class DeviceRequestsController : ControllerBase
                 isRegistered = db is not null,
                 deviceId = db?.DeviceId,
                 deviceName = db?.Name,
-                provisioningExpiresAt = db?.ProvisioningExpiresAt,
+                provisioningExpiresAtUtc = db?.ProvisioningExpiresAtUtc,
                 hasPassword = db?.MqttCredential != null,
                 isDelivered = db?.IsDelivered ?? false
             };
@@ -176,13 +176,13 @@ public class DeviceRequestsController : ControllerBase
         if (device.MqttCredential is null)
             return BadRequest(new { error = "El dispositivo no tiene password. Créelo primero." });
 
-        device.ProvisioningExpiresAt = DateTime.UtcNow.AddMinutes(ProvisioningWindowMinutes);
+        device.ProvisioningExpiresAtUtc = DateTime.UtcNow.AddMinutes(ProvisioningWindowMinutes);
         await _db.SaveChangesAsync();
         _deviceRequests.TryApprove(id);
 
         return Ok(new
         {
-            provisioningExpiresAt = device.ProvisioningExpiresAt,
+            provisioningExpiresAtUtc = device.ProvisioningExpiresAtUtc,
             message = $"Ventana abierta. El dispositivo tiene {ProvisioningWindowMinutes} minutos para obtener sus credenciales."
         });
     }
