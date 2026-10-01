@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using WebDispositivosMqtt.Controllers.Api;
 using WebDispositivosMqtt.Hubs;
 using WebDispositivosMqtt.Identity;
 using WebDispositivosMqtt.DataIdentity.Models;
@@ -13,6 +14,7 @@ using WebDispositivosMqtt.Services.Provisioning;
 using WebDispositivosMqtt.Services.DeviceRequests;
 using WebDispositivosMqtt.Services.Dynsec;
 using WebDispositivosMqtt.Services.Commands;
+using WebDispositivosMqtt.Services.Readings;
 using WebDispositivosMqtt.Services.Telemetria;
 using WebDispositivosMqtt.Services.Alarms;
 using WebDispositivosMqtt.Services.Auth;
@@ -74,6 +76,14 @@ namespace WebDispositivosMqtt
 
             // Opciones de la terminal web
             builder.Services.Configure<TerminalOptions>(builder.Configuration.GetSection("Terminal"));
+
+            // "Deslizar para actualizar" de la app (POST api/devices/{id}/refresh)
+            builder.Services.Configure<RefreshOptions>(builder.Configuration.GetSection("Refresh"));
+            builder.Services.AddSingleton<IReadingEvents, ReadingEvents>();
+            builder.Services.AddSingleton<IMeasurementWaiter, MeasurementWaiter>();
+
+            // devices/{mac}/info: lecturas que anuncia cada equipo
+            builder.Services.AddScoped<IDeviceInfoService, DeviceInfoService>();
 
             // Servicio de solicitudes de credenciales desde dispositivos ESP32
             builder.Services.Configure<DeviceRequestOptions>(builder.Configuration.GetSection("DeviceRequests"));
@@ -145,7 +155,7 @@ namespace WebDispositivosMqtt
             if (!app.Environment.IsDevelopment())
             {
                 app.UseWhen(
-                    ctx => !ctx.Request.Path.StartsWithSegments("/api/devices"),
+                    ctx => !ctx.Request.Path.StartsWithSegments("/api/devices/credential-request"),
                     appBuilder => appBuilder.UseHttpsRedirection()
                 );
             }

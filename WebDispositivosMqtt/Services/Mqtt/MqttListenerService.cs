@@ -4,6 +4,7 @@ using MQTTnet.Protocol;
 using WebDispositivosMqtt.Services.Alarms;
 using WebDispositivosMqtt.Services.Commands;
 using WebDispositivosMqtt.Services.Devices;
+using WebDispositivosMqtt.Services.Readings;
 using WebDispositivosMqtt.Services.Telemetria;
 using WebDispositivosMqtt.Utils;
 
@@ -16,6 +17,8 @@ namespace WebDispositivosMqtt.Services.Mqtt
         private IMqttClient? _mqttClient;
         private readonly IDeviceConnectionService _deviceConnectionService;
         private readonly ICommandAckService _commandAckService;
+        private readonly IMeasurementWaiter _measurementWaiter;
+        private readonly IReadingEvents _readingEvents;
         private readonly IServiceScopeFactory _scopeFactory;
         private int _reconnecting = 0;
 
@@ -24,12 +27,16 @@ namespace WebDispositivosMqtt.Services.Mqtt
             ILogger<MqttListenerService> logger,
             IDeviceConnectionService devConnService,
             ICommandAckService commandAckService,
+            IMeasurementWaiter measurementWaiter,
+            IReadingEvents readingEvents,
             IServiceScopeFactory scopeFactory)
         {
             _options = options.Value;
             _logger = logger;
             _deviceConnectionService = devConnService;
             _commandAckService = commandAckService;
+            _measurementWaiter = measurementWaiter;
+            _readingEvents = readingEvents;
             _scopeFactory = scopeFactory;
         }
 
@@ -70,13 +77,23 @@ namespace WebDispositivosMqtt.Services.Mqtt
 
                 if (resource == "commands" && subtype == "ack")
                 {
-                    await _commandAckService.AcknowledgeAsync(entityId, payload);
+                    var record = await _commandAckService.AcknowledgeAsync(entityId, payload);
+                    if (record is not null)
+                        _measurementWaiter.OnAck(entityId, record);
                 }
                 else if (resource == "tel")
                 {
                     using var scope = _scopeFactory.CreateScope();
                     var telemetriaService = scope.ServiceProvider.GetRequiredService<ITelemetriaService>();
-                    await telemetriaService.ProcesarAsync(entityId, topic, payload);
+                    // Se avisa recién con la lectura en la BD: quien espera la lee después
+                    if (await telemetriaService.ProcesarAsync(entityId, topic, payload))
+                        _readingEvents.Publish(entityId, subtype);
+                }
+                else if (resource == "info")
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var deviceInfoService = scope.ServiceProvider.GetRequiredService<IDeviceInfoService>();
+                    await deviceInfoService.ProcessAsync(entityId, payload);
                 }
                 else if (resource == "alarm")
                 {

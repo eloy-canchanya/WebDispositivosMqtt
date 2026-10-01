@@ -20,8 +20,10 @@ namespace WebDispositivosMqtt.Services.Commands
     public interface ICommandAckService
     {
         string RegisterCommand(string mac, string cmd);
-        Task AcknowledgeAsync(string mac, string rawPayload);
+        // El comando confirmado, o null si el ack no corresponde a ninguno
+        Task<CommandRecord?> AcknowledgeAsync(string mac, string rawPayload);
         IReadOnlyList<CommandRecord> GetPendingFor(string mac);
+        bool TryGet(string commandId, out CommandRecord record);
     }
 
     public class CommandAckService(IHubContext<DeviceConnectionsHub> hub, ILogger<CommandAckService> logger) : ICommandAckService
@@ -47,7 +49,7 @@ namespace WebDispositivosMqtt.Services.Commands
         private static string SanitizeForJson(string s)
             => new(s.Where(c => c >= 0x20 || c == '\t').ToArray());
 
-        public async Task AcknowledgeAsync(string mac, string rawPayload)
+        public async Task<CommandRecord?> AcknowledgeAsync(string mac, string rawPayload)
         {
             string? commandId = null;
             string? status    = null;
@@ -65,14 +67,14 @@ namespace WebDispositivosMqtt.Services.Commands
             {
                 logger.LogWarning(ex, "Ack de {Mac}: JSON inválido incluso tras sanitizar. Preview: {Preview}",
                     mac, rawPayload.Length > 120 ? rawPayload[..120] : rawPayload);
-                return;
+                return null;
             }
 
             if (commandId is null || !_commands.TryGetValue(commandId, out var record))
             {
                 logger.LogWarning("Ack de {Mac}: commandId={CommandId} sin match ({Count} comandos activos)",
                     mac, commandId ?? "(null)", _commands.Count);
-                return;
+                return null;
             }
 
             record.AckedAtUtc = DateTime.UtcNow;
@@ -80,6 +82,7 @@ namespace WebDispositivosMqtt.Services.Commands
             record.Response   = response;
 
             await DeviceConnectionsHub.NotifyCommandAckedAsync(hub, record);
+            return record;
         }
 
         public IReadOnlyList<CommandRecord> GetPendingFor(string mac)
@@ -89,5 +92,8 @@ namespace WebDispositivosMqtt.Services.Commands
                 .Where(c => c.Mac == mac && !c.IsAcked && c.SentAtUtc > cutoff)
                 .ToList();
         }
+
+        public bool TryGet(string commandId, out CommandRecord record)
+            => _commands.TryGetValue(commandId, out record!);
     }
 }

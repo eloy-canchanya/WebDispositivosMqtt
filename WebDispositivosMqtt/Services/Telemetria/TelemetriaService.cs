@@ -20,7 +20,7 @@ public class TelemetriaService : ITelemetriaService
         _logger = logger;
     }
 
-    public async Task ProcesarAsync(string mac, string topic, string payload)
+    public async Task<bool> ProcesarAsync(string mac, string topic, string payload)
     {
         var device = await _context.Devices
             .Include(d => d.DeviceType)
@@ -42,7 +42,7 @@ public class TelemetriaService : ITelemetriaService
             log.ErrorMessage = $"Dispositivo no encontrado para MAC {mac}";
             _logger.LogWarning(log.ErrorMessage);
             await _context.SaveChangesAsync();
-            return;
+            return false;
         }
 
         var spName = device.DeviceType?.TelemetrySp;
@@ -52,7 +52,7 @@ public class TelemetriaService : ITelemetriaService
             log.ErrorMessage = $"DeviceType o SpTelemetria no configurado para MAC {mac}";
             _logger.LogWarning(log.ErrorMessage);
             await _context.SaveChangesAsync();
-            return;
+            return false;
         }
 
         if (!SpNameRegex.IsMatch(spName))
@@ -60,7 +60,7 @@ public class TelemetriaService : ITelemetriaService
             log.ErrorMessage = $"Nombre de SP inválido: {spName}";
             _logger.LogError(log.ErrorMessage);
             await _context.SaveChangesAsync();
-            return;
+            return false;
         }
 
         try
@@ -84,5 +84,7 @@ public class TelemetriaService : ITelemetriaService
         {
             await _context.SaveChangesAsync();
         }
+
+        return log.Processed;
     }
 }
