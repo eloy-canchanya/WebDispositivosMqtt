@@ -27,17 +27,19 @@ public partial class Device
 
     public int? DeviceTypeId { get; set; }
 
+    public string Readings { get; set; }
+
     public virtual ICollection<Alarm> Alarms { get; set; } = new List<Alarm>();
 
     public virtual ICollection<ChlorinatorBattery> ChlorinatorBatteries { get; set; } = new List<ChlorinatorBattery>();
+
+    public virtual ChlorinatorConfig ChlorinatorConfig { get; set; }
 
     public virtual ICollection<ChlorinatorDailySummary> ChlorinatorDailySummaries { get; set; } = new List<ChlorinatorDailySummary>();
 
     public virtual ICollection<ChlorinatorDose> ChlorinatorDoses { get; set; } = new List<ChlorinatorDose>();
 
     public virtual ICollection<ChlorinatorLevel> ChlorinatorLevels { get; set; } = new List<ChlorinatorLevel>();
-
-    public virtual ChlorinatorTank ChlorinatorTank { get; set; }
 
     public virtual DeviceType DeviceType { get; set; }
 

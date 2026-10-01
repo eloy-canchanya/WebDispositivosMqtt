@@ -17,5 +17,7 @@ public partial class ChlorinatorBattery
 
     public DateTime CreatedAtUtc { get; set; }
 
+    public string TriggerType { get; set; }
+
     public virtual Device Device { get; set; }
 }

@@ -20,15 +20,17 @@ public partial class DatabaseContext : DbContext
 
     public virtual DbSet<AspNetUser> AspNetUsers { get; set; }
 
+    public virtual DbSet<BatteryType> BatteryTypes { get; set; }
+
     public virtual DbSet<ChlorinatorBattery> ChlorinatorBatteries { get; set; }
+
+    public virtual DbSet<ChlorinatorConfig> ChlorinatorConfigs { get; set; }
 
     public virtual DbSet<ChlorinatorDailySummary> ChlorinatorDailySummaries { get; set; }
 
     public virtual DbSet<ChlorinatorDose> ChlorinatorDoses { get; set; }
 
     public virtual DbSet<ChlorinatorLevel> ChlorinatorLevels { get; set; }
-
-    public virtual DbSet<ChlorinatorTank> ChlorinatorTanks { get; set; }
 
     public virtual DbSet<Device> Devices { get; set; }
 
@@ -109,6 +111,28 @@ public partial class DatabaseContext : DbContext
             entity.Property(e => e.UserName).HasMaxLength(256);
         });
 
+        modelBuilder.Entity<BatteryType>(entity =>
+        {
+            entity.HasIndex(e => e.Name, "UQ_BatteryTypes_Name").IsUnique();
+
+            entity.HasIndex(e => e.IsDefault, "UX_BatteryTypes_IsDefault")
+                .IsUnique()
+                .HasFilter("([IsDefault]=(1))");
+
+            entity.Property(e => e.ChargingMinV)
+                .HasColumnType("decimal(5, 2)")
+                .HasColumnName("ChargingMin_V");
+            entity.Property(e => e.GoodMinV)
+                .HasColumnType("decimal(5, 2)")
+                .HasColumnName("GoodMin_V");
+            entity.Property(e => e.LowMinV)
+                .HasColumnType("decimal(5, 2)")
+                .HasColumnName("LowMin_V");
+            entity.Property(e => e.Name)
+                .IsRequired()
+                .HasMaxLength(50);
+        });
+
         modelBuilder.Entity<ChlorinatorBattery>(entity =>
         {
             entity.ToTable("ChlorinatorBattery");
@@ -118,6 +142,10 @@ public partial class DatabaseContext : DbContext
             entity.Property(e => e.CreatedAtUtc)
                 .HasPrecision(0)
                 .HasDefaultValueSql("(sysutcdatetime())", "DF_ChlorinatorBattery_CreatedAtUtc");
+            entity.Property(e => e.TriggerType)
+                .IsRequired()
+                .HasMaxLength(20)
+                .HasDefaultValue("auto", "DF_ChlorinatorBattery_TriggerType");
             entity.Property(e => e.TsUtc).HasPrecision(0);
             entity.Property(e => e.VoltageV)
                 .HasColumnType("decimal(5, 2)")
@@ -127,6 +155,29 @@ public partial class DatabaseContext : DbContext
                 .HasForeignKey(d => d.DeviceId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_ChlorinatorBattery_Device");
+        });
+
+        modelBuilder.Entity<ChlorinatorConfig>(entity =>
+        {
+            entity.HasKey(e => e.DeviceId);
+
+            entity.ToTable("ChlorinatorConfig");
+
+            entity.Property(e => e.DeviceId).ValueGeneratedNever();
+            entity.Property(e => e.EmptyDistanceMm).HasColumnName("EmptyDistance_mm");
+            entity.Property(e => e.FullDistanceMm).HasColumnName("FullDistance_mm");
+            entity.Property(e => e.UpdatedAtUtc)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())", "DF_ChlorinatorConfig_UpdatedAtUtc");
+
+            entity.HasOne(d => d.BatteryType).WithMany(p => p.ChlorinatorConfigs)
+                .HasForeignKey(d => d.BatteryTypeId)
+                .HasConstraintName("FK_ChlorinatorConfig_BatteryType");
+
+            entity.HasOne(d => d.Device).WithOne(p => p.ChlorinatorConfig)
+                .HasForeignKey<ChlorinatorConfig>(d => d.DeviceId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ChlorinatorConfig_Device");
         });
 
         modelBuilder.Entity<ChlorinatorDailySummary>(entity =>
@@ -173,31 +224,16 @@ public partial class DatabaseContext : DbContext
                 .HasPrecision(0)
                 .HasDefaultValueSql("(sysutcdatetime())", "DF_ChlorinatorLevel_CreatedAtUtc");
             entity.Property(e => e.DistanceMm).HasColumnName("Distance_mm");
+            entity.Property(e => e.TriggerType)
+                .IsRequired()
+                .HasMaxLength(20)
+                .HasDefaultValue("auto", "DF_ChlorinatorLevel_TriggerType");
             entity.Property(e => e.TsUtc).HasPrecision(0);
 
             entity.HasOne(d => d.Device).WithMany(p => p.ChlorinatorLevels)
                 .HasForeignKey(d => d.DeviceId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_ChlorinatorLevel_Device");
-        });
-
-        modelBuilder.Entity<ChlorinatorTank>(entity =>
-        {
-            entity.HasKey(e => e.DeviceId);
-
-            entity.ToTable("ChlorinatorTank");
-
-            entity.Property(e => e.DeviceId).ValueGeneratedNever();
-            entity.Property(e => e.EmptyDistanceMm).HasColumnName("EmptyDistance_mm");
-            entity.Property(e => e.FullDistanceMm).HasColumnName("FullDistance_mm");
-            entity.Property(e => e.UpdatedAtUtc)
-                .HasPrecision(0)
-                .HasDefaultValueSql("(sysutcdatetime())", "DF_ChlorinatorTank_UpdatedAtUtc");
-
-            entity.HasOne(d => d.Device).WithOne(p => p.ChlorinatorTank)
-                .HasForeignKey<ChlorinatorTank>(d => d.DeviceId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_ChlorinatorTank_Device");
         });
 
         modelBuilder.Entity<Device>(entity =>
@@ -220,6 +256,9 @@ public partial class DatabaseContext : DbContext
                 .IsRequired()
                 .HasMaxLength(100);
             entity.Property(e => e.ProvisioningExpiresAtUtc).HasPrecision(0);
+            entity.Property(e => e.Readings)
+                .HasMaxLength(100)
+                .IsUnicode(false);
             entity.Property(e => e.RegisteredAtUtc)
                 .HasPrecision(0)
                 .HasDefaultValueSql("(sysutcdatetime())", "DF_Device_RegisteredAtUtc");

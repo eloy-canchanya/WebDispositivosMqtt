@@ -5,15 +5,19 @@ using System.Collections.Generic;
 
 namespace WebDispositivosMqtt.Data.Models;
 
-public partial class ChlorinatorTank
+public partial class ChlorinatorConfig
 {
     public Guid DeviceId { get; set; }
 
-    public int FullDistanceMm { get; set; }
+    public int? FullDistanceMm { get; set; }
 
-    public int EmptyDistanceMm { get; set; }
+    public int? EmptyDistanceMm { get; set; }
+
+    public int? BatteryTypeId { get; set; }
 
     public DateTime UpdatedAtUtc { get; set; }
+
+    public virtual BatteryType BatteryType { get; set; }
 
     public virtual Device Device { get; set; }
 }

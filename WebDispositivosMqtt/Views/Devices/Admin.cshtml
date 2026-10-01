@@ -2,6 +2,8 @@
 
 @{
     ViewData["Title"] = "Administración de dispositivos";
+    var batteryTypes = ViewData["BatteryTypes"] as IReadOnlyList<WebDispositivosMqtt.Controllers.BatteryTypeOption>
+                       ?? Array.Empty<WebDispositivosMqtt.Controllers.BatteryTypeOption>();
 }
 
 @functions {
@@ -30,6 +32,7 @@
 {
     <div class="alert alert-danger">@errMsg</div>
 }
+<div id="pageMsg" class="alert d-none"></div>
 
 <div class="table-responsive">
 <table class="table table-striped align-middle">
@@ -43,13 +46,14 @@
             <th>Password</th>
             <th class="d-none d-md-table-cell">DynSec</th>
             <th>Entregado</th>
+            <th></th>
         </tr>
     </thead>
     <tbody>
         @if (!Model.Any())
         {
             <tr>
-                <td colspan="8" class="text-center text-muted">No hay dispositivos registrados.</td>
+                <td colspan="9" class="text-center text-muted">No hay dispositivos registrados.</td>
             </tr>
         }
         else
@@ -114,6 +118,15 @@
                             </form>
                         }
                     </td>
+                    <td class="text-end">
+                        <button type="button"
+                                class="btn btn-sm btn-outline-secondary btn-open-config"
+                                data-device-id="@d.DeviceId"
+                                data-device-name="@d.Name"
+                                title="Configuración">
+                            ⚙<span class="d-none d-md-inline ms-1">Configuración</span>
+                        </button>
+                    </td>
                 </tr>
             }
         }
@@ -121,8 +134,123 @@
 </table>
 </div>
 
+@* Modal de configuración. Un ajuste nuevo es un <fieldset> más acá, con inputs
+   cuyo name coincida con el campo que devuelve Devices/Config: el JS los llena solo. *@
+<div class="modal fade" id="configModal" tabindex="-1" aria-labelledby="configModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="configModalLabel">Configuración · <span id="cfgDeviceName"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div id="cfgError" class="alert alert-danger d-none"></div>
+
+                <form id="cfgForm" novalidate>
+                    <fieldset>
+                        <legend class="fs-6 fw-semibold">Nivel del tanque</legend>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label for="cfgFull" class="form-label small">Lleno (mm)</label>
+                                <input id="cfgFull" name="fullDistanceMm" type="number" min="1" step="1" class="form-control" />
+                            </div>
+                            <div class="col-6">
+                                <label for="cfgEmpty" class="form-label small">Vacío (mm)</label>
+                                <input id="cfgEmpty" name="emptyDistanceMm" type="number" min="1" step="1" class="form-control" />
+                            </div>
+                        </div>
+                        <div class="form-text">Distancia del sensor a la superficie del líquido. Vacías: sin calibrar.</div>
+                    </fieldset>
+
+                    <fieldset class="mt-4">
+                        <legend class="fs-6 fw-semibold">Batería</legend>
+                        <select id="cfgBattery" name="batteryTypeId" class="form-select" aria-label="Tipo de batería">
+                            <option value="">Por defecto (@(batteryTypes.FirstOrDefault(b => b.IsDefault)?.Name ?? "sin definir"))</option>
+                            @foreach (var b in batteryTypes)
+                            {
+                                <option value="@b.Id">@b.Name</option>
+                            }
+                        </select>
+                    </fieldset>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="cfgSave" class="btn btn-primary" disabled>Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
+    @Html.AntiForgeryToken()
     <script>
+        // ─── Modal de configuración ───────────────────────────────────────────
+        const aft = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? "";
+
+        const configModal   = document.getElementById("configModal");
+        const cfgDeviceName = document.getElementById("cfgDeviceName");
+        const cfgError      = document.getElementById("cfgError");
+        const cfgForm       = document.getElementById("cfgForm");
+        const cfgSave       = document.getElementById("cfgSave");
+        const pageMsg       = document.getElementById("pageMsg");
+
+        let cfgDeviceId = null;
+
+        function cfgShowError(msg) {
+            cfgError.textContent = msg;
+            cfgError.classList.toggle("d-none", !msg);
+        }
+
+        document.querySelectorAll(".btn-open-config").forEach(btn => {
+            btn.addEventListener("click", async () => {
+                cfgDeviceId = btn.dataset.deviceId;
+                cfgDeviceName.textContent = btn.dataset.deviceName || cfgDeviceId;
+                cfgForm.reset();
+                cfgShowError("");
+                cfgSave.disabled = true;
+                bootstrap.Modal.getOrCreateInstance(configModal).show();
+
+                try {
+                    const res  = await fetch(`/Devices/Config?deviceId=${encodeURIComponent(cfgDeviceId)}`);
+                    const data = await res.json();
+                    if (!data.ok) { cfgShowError(data.error ?? "Error al cargar."); return; }
+
+                    // Cada input se llena con el campo del mismo nombre
+                    for (const el of cfgForm.elements)
+                        if (el.name && el.name in data.config) el.value = data.config[el.name] ?? "";
+
+                    cfgSave.disabled = false;
+                } catch {
+                    cfgShowError("Error de red.");
+                }
+            });
+        });
+
+        cfgSave.addEventListener("click", async () => {
+            cfgShowError("");
+            cfgSave.disabled = true;
+
+            try {
+                const fd = new FormData(cfgForm);
+                fd.append("deviceId", cfgDeviceId);
+                fd.append("__RequestVerificationToken", aft);
+
+                const res  = await fetch("/Devices/SaveConfig", { method: "POST", body: fd });
+                const data = await res.json();
+
+                if (!data.ok) { cfgShowError(data.error ?? "Error al guardar."); return; }
+
+                bootstrap.Modal.getOrCreateInstance(configModal).hide();
+                pageMsg.textContent = data.message;
+                pageMsg.className = "alert alert-success";
+            } catch {
+                cfgShowError("Error de red.");
+            } finally {
+                cfgSave.disabled = false;
+            }
+        });
+
         // Verificación DynSec por dispositivo
         async function applyDynsecStatus(badge, data) {
             switch (data.status) {

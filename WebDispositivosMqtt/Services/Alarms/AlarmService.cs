@@ -67,6 +67,7 @@ public class AlarmService(DatabaseContext db, ILogger<AlarmService> logger) : IA
             Data = new Dictionary<string, string>
             {
                 ["alarmId"] = alarm.Id.ToString(),
+                ["deviceId"] = alarm.DeviceId.ToString(),
                 ["type"] = alarm.Type,
                 ["severity"] = alarm.Severity.ToString(),
             }

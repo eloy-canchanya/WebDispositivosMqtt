@@ -17,5 +17,7 @@ public partial class ChlorinatorLevel
 
     public DateTime CreatedAtUtc { get; set; }
 
+    public string TriggerType { get; set; }
+
     public virtual Device Device { get; set; }
 }

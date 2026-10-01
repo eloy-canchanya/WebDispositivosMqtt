@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebDispositivosMqtt.Data;
+using WebDispositivosMqtt.Data.Models;
 using WebDispositivosMqtt.DataIdentity.Models;
 using Microsoft.Extensions.Options;
 using WebDispositivosMqtt.Services.Commands;
@@ -23,6 +24,8 @@ namespace WebDispositivosMqtt.Controllers
         DateTime? ProvisioningExpiresAtUtc,
         bool HasPassword,
         bool IsDelivered);
+
+    public record BatteryTypeOption(int Id, string Name, bool IsDefault);
 
     public record DeviceConnectionViewModel
     {
@@ -134,6 +137,12 @@ namespace WebDispositivosMqtt.Controllers
                     d.IsDelivered))
                 .ToListAsync();
 
+            // Opciones del desplegable de batería del modal de configuración
+            ViewData["BatteryTypes"] = await db.BatteryTypes
+                .OrderBy(b => b.Id)
+                .Select(b => new BatteryTypeOption(b.Id, b.Name, b.IsDefault))
+                .ToListAsync();
+
             return View(devices);
         }
 
@@ -210,6 +219,76 @@ namespace WebDispositivosMqtt.Controllers
 
             TempData["Ok"] = $"Ventana abierta para {device.Name}. El dispositivo tiene 10 minutos para provisionarse.";
             return RedirectToAction(nameof(Admin));
+        }
+
+        // Valores actuales para el modal de configuración. Cada campo se llama
+        // igual que el input del modal (en camelCase), que se llena solo.
+        [HttpGet]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Config([FromQuery] Guid deviceId)
+        {
+            var config = await db.Devices
+                .Where(d => d.DeviceId == deviceId)
+                .Select(d => new
+                {
+                    FullDistanceMm  = (int?)d.ChlorinatorConfig.FullDistanceMm,
+                    EmptyDistanceMm = (int?)d.ChlorinatorConfig.EmptyDistanceMm,
+                    BatteryTypeId   = (int?)d.ChlorinatorConfig.BatteryTypeId
+                })
+                .FirstOrDefaultAsync();
+
+            if (config is null)
+                return Json(new { ok = false, error = "Dispositivo no encontrado." });
+
+            return Json(new { ok = true, config });
+        }
+
+        // Guarda el modal completo en ChlorinatorConfig. Un campo vacío es NULL:
+        // tanque sin calibrar, o batería del tipo por defecto.
+        [HttpPost]
+        [Authorize(Roles = "Admin")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveConfig(
+            [FromForm] Guid deviceId,
+            [FromForm] int? fullDistanceMm,
+            [FromForm] int? emptyDistanceMm,
+            [FromForm] int? batteryTypeId)
+        {
+            if (!ModelState.IsValid)
+                return Json(new { ok = false, error = "Las distancias deben ser números enteros en mm." });
+
+            var device = await db.Devices.FindAsync(deviceId);
+            if (device is null)
+                return Json(new { ok = false, error = "Dispositivo no encontrado." });
+
+            // Mismas reglas que CK_ChlorinatorConfig_Distances: las dos o ninguna
+            if ((fullDistanceMm is null) != (emptyDistanceMm is null))
+                return Json(new { ok = false, error = "Completá las dos distancias del tanque, o dejá las dos vacías." });
+            if (fullDistanceMm <= 0)
+                return Json(new { ok = false, error = "La distancia de lleno debe ser mayor que 0." });
+            if (emptyDistanceMm <= fullDistanceMm)
+                return Json(new { ok = false, error = "La distancia de vacío debe ser mayor que la de lleno: el sensor está arriba." });
+
+            if (batteryTypeId is not null && !await db.BatteryTypes.AnyAsync(b => b.Id == batteryTypeId))
+                return Json(new { ok = false, error = "Tipo de batería desconocido." });
+
+            var config = await db.ChlorinatorConfigs.FindAsync(deviceId);
+            if (config is null)
+            {
+                config = new ChlorinatorConfig { DeviceId = deviceId };
+                db.ChlorinatorConfigs.Add(config);
+            }
+
+            config.FullDistanceMm  = fullDistanceMm;
+            config.EmptyDistanceMm = emptyDistanceMm;
+            config.BatteryTypeId   = batteryTypeId;
+            config.UpdatedAtUtc    = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+
+            logger.LogInformation("Configuración de {Mac}: lleno {Full} mm, vacío {Empty} mm, batería {BatteryTypeId}",
+                device.MacAddress, config.FullDistanceMm, config.EmptyDistanceMm, config.BatteryTypeId);
+
+            return Json(new { ok = true, message = $"Configuración guardada para {device.Name}." });
         }
 
         [HttpPost]

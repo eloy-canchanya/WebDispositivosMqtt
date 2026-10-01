@@ -27,7 +27,15 @@
          "ObjectType": 0
       },
       {
+         "Name": "[dbo].[BatteryTypes]",
+         "ObjectType": 0
+      },
+      {
          "Name": "[dbo].[ChlorinatorBattery]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[ChlorinatorConfig]",
          "ObjectType": 0
       },
       {
@@ -40,10 +48,6 @@
       },
       {
          "Name": "[dbo].[ChlorinatorLevel]",
-         "ObjectType": 0
-      },
-      {
-         "Name": "[dbo].[ChlorinatorTank]",
          "ObjectType": 0
       },
       {
